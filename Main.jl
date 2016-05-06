@@ -23,8 +23,10 @@
  * Created by jeffreyvarner on 5/4/2016
  =#
 
-function estimate_ensemble(objective_function::Function,neighbor_function::Function,acceptance_probability_function::Function,
-  initial_state::Array{Float64,1}; maximum_number_of_iterations=1000,rank_cutoff=4,show_trace=true)
+using Debug
+
+@debug function estimate_ensemble(objective_function::Function,neighbor_function::Function,acceptance_probability_function::Function,
+  initial_state::Array{Float64,1}; maximum_number_of_iterations=20,rank_cutoff=4,show_trace=true)
 
   # check function arguments
   # ...
@@ -32,7 +34,7 @@ function estimate_ensemble(objective_function::Function,neighbor_function::Funct
   # internal parameters -
   temperature = 1.0
   temperature_min = temperature/10000
-  alpha = 0.9
+  alpha = 0.95
 
   # Grab the initial parameters -
   parameter_array_best = initial_state
@@ -44,7 +46,7 @@ function estimate_ensemble(objective_function::Function,neighbor_function::Funct
   parameter_cache = parameter_array_best
 
   # how many objectives do we have?
-  number_of_objectives = length(local_error_array)
+  number_of_objectives = length(error_cache)
 
   # main loop -
   while (temperature>temperature_min)
@@ -70,18 +72,21 @@ function estimate_ensemble(objective_function::Function,neighbor_function::Funct
 
       # do we accept the new solution?
       acceptance_probability = acceptance_probability_function(pareto_rank_array,temperature)
-      if (acceptance_probability>rand)
+      if (acceptance_probability>rand())
 
         # Select the rank -
-        rank = pareto_rank_array[end]
-        archive_select_index = find(rank.<rank_cutoff)
+        archive_select_index = find(pareto_rank_array.<rank_cutoff)
 
         # update the caches -
         error_cache = error_cache[:,archive_select_index]
-        parameter_cache = parameter_cache[:,parameter_cache]
+        parameter_cache = parameter_cache[:,archive_select_index]
 
         # update the parameters -
         parameter_array_best = test_parameter_array
+
+        if (show_trace == true)
+          @show iteration_index,temperature
+        end
       end
 
       # check - should we go around again?
