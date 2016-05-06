@@ -26,7 +26,7 @@
 using Debug
 
 @debug function estimate_ensemble(objective_function::Function,neighbor_function::Function,acceptance_probability_function::Function,
-  initial_state::Array{Float64,1}; maximum_number_of_iterations=20,rank_cutoff=4,show_trace=true)
+  initial_state::Array{Float64,1}; maximum_number_of_iterations=20,rank_cutoff=5.0,show_trace=true)
 
   # check function arguments
   # ...
@@ -34,7 +34,7 @@ using Debug
   # internal parameters -
   temperature = 1.0
   temperature_min = temperature/10000
-  alpha = 0.95
+  alpha = 0.90
 
   # Grab the initial parameters -
   parameter_array_best = initial_state
@@ -44,6 +44,9 @@ using Debug
 
   # initialize parameter_cache -
   parameter_cache = parameter_array_best
+
+  # initialize the Pareto rank array from the error_cache -
+  pareto_rank_array = rank_function(error_cache)
 
   # how many objectives do we have?
   number_of_objectives = length(error_cache)
@@ -104,7 +107,7 @@ using Debug
   end # end: outer while-loop (temperature)
 
   # return the caches -
-  return (error_cache,parameter_cache)
+  return (error_cache,parameter_cache,pareto_rank_array)
 end
 
 # Pareto ranking function -
