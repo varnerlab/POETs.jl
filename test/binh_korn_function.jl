@@ -38,11 +38,42 @@ function neighbor_function(parameter_array)
   number_of_parameters = length(parameter_array)
 
   # calculate new parameters -
-  return parameter_array.*(1+SIGMA*randn(number_of_parameters))
+  new_parameter_array = parameter_array.*(1+SIGMA*randn(number_of_parameters))
+
+  # Check the bound constraints -
+  LOWER_BOUND = [0,0]
+  UPPER_BOUND = [5,3]
+
+  # return the corrected parameter arrays -
+  return parameter_bounds_function(new_parameter_array,LOWER_BOUND,UPPER_BOUND)
 end
 
 @debug function acceptance_probability_function(rank_array,temperature)
 
   return (exp(-rank_array[end]/temperature))
 
+end
+
+# Helper functions -
+function parameter_bounds_function(x,MINJ,MAXJ)
+
+	JMIN_NEW = find(x.<MINJ)
+	x[JMIN_NEW] = MINJ[JMIN_NEW]+(MINJ[JMIN_NEW]-x[JMIN_NEW])
+
+	JTEMP1 = find(x[JMIN_NEW].>MAXJ[JMIN_NEW]);
+	x[JTEMP1] = MINJ[JTEMP1]
+
+	JMAX_NEW = find(x.>MAXJ)
+	x[JMAX_NEW] = MAXJ[JMAX_NEW]-(x[JMAX_NEW]-MAXJ[JMAX_NEW])
+
+	JTEMP2 = find(x[JMAX_NEW].<MINJ[JMAX_NEW])
+	x[JTEMP2] = MAXJ[JTEMP2]
+
+	CHKMAX = find(x.>MAXJ);
+	x[CHKMAX] = MINJ[CHKMAX];
+
+	CHKMIN = find(x.<MINJ);
+	x[CHKMIN] = MAXJ[CHKMIN];
+
+  return x
 end
