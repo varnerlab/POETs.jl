@@ -44,7 +44,7 @@ function neighbor_function(parameter_array)
   UPPER_BOUND = 4.0
 
   # return the corrected parameter arrays -
-  return bounds(new_parameter_array,LOWER_BOUND*ones(number_of_parameters),UPPER_BOUND*ones(number_of_parameters))
+  return parameter_bounds_function(new_parameter_array,LOWER_BOUND*ones(number_of_parameters),UPPER_BOUND*ones(number_of_parameters))
 end
 
 function acceptance_probability_function(rank_array,temperature)
@@ -52,19 +52,19 @@ function acceptance_probability_function(rank_array,temperature)
 end
 
 # Helper functions -
-function bounds(x,MINJ,MAXJ)
+function parameter_bounds_function(x,MINJ,MAXJ)
 
-	JMIN_NEW = find(x.<MINJ);
-	x[JMIN_NEW] = MINJ[JMIN_NEW]+(MINJ[JMIN_NEW]-x[JMIN_NEW]);
+	JMIN_NEW = find(x.<MINJ)
+	x[JMIN_NEW] = MINJ[JMIN_NEW]+(MINJ[JMIN_NEW]-x[JMIN_NEW])
 
 	JTEMP1 = find(x[JMIN_NEW].>MAXJ[JMIN_NEW]);
-	x[JTEMP1] = MINJ[JTEMP1];
+	x[JTEMP1] = MINJ[JTEMP1]
 
-	JMAX_NEW = find(x.>MAXJ);
-	x[JMAX_NEW] = MAXJ[JMAX_NEW]-(x[JMAX_NEW]-MAXJ[JMAX_NEW]);
+	JMAX_NEW = find(x.>MAXJ)
+	x[JMAX_NEW] = MAXJ[JMAX_NEW]-(x[JMAX_NEW]-MAXJ[JMAX_NEW])
 
-	JTEMP2 = find(x[JMAX_NEW].<MINJ[JMAX_NEW]);
-	x[JTEMP2 = MAXJ[JTEMP2];
+	JTEMP2 = find(x[JMAX_NEW].<MINJ[JMAX_NEW])
+	x[JTEMP2] = MAXJ[JTEMP2]
 
 	CHKMAX = find(x.>MAXJ);
 	x[CHKMAX] = MINJ[CHKMAX];
