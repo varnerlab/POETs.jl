@@ -26,7 +26,7 @@
 using Debug
 
 @debug function estimate_ensemble(objective_function::Function,neighbor_function::Function,acceptance_probability_function::Function,
-  initial_state::Array{Float64,1}; maximum_number_of_iterations=20,rank_cutoff=5.0,show_trace=true)
+  initial_state::Array{Float64,1},number_of_objectives::Int;maximum_number_of_iterations=20,rank_cutoff=5.0,show_trace=true)
 
   # check function arguments
   # ...
