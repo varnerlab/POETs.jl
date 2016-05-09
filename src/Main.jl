@@ -88,10 +88,8 @@ using Debug
         parameter_array_best = test_parameter_array
 
         if (show_trace == true)
-          #@show iteration_index,temperature
+          @show iteration_index,temperature
         end
-
-        @show iteration_index,temperature
       end
 
       # check - should we go around again?
