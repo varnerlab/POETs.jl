@@ -52,25 +52,24 @@ function acceptance_probability_function(rank_array,temperature)
 end
 
 # Helper functions -
-function parameter_bounds_function(x,MINJ,MAXJ)
+function parameter_bounds_function(parameter_array,lower_bound_array,upper_bound_array)
 
-	JMIN_NEW = find(x.<MINJ)
-	x[JMIN_NEW] = MINJ[JMIN_NEW]+(MINJ[JMIN_NEW]-x[JMIN_NEW])
+  # reflection_factor -
+  epsilon = 0.01
 
-	JTEMP1 = find(x[JMIN_NEW].>MAXJ[JMIN_NEW]);
-	x[JTEMP1] = MINJ[JTEMP1]
+  # iterate through and fix the parameters -
+  new_parameter_array = copy(parameter_array)
+  for (index,value) in enumerate(parameter_array)
 
-	JMAX_NEW = find(x.>MAXJ)
-	x[JMAX_NEW] = MAXJ[JMAX_NEW]-(x[JMAX_NEW]-MAXJ[JMAX_NEW])
+    lower_bound = lower_bound_array[index]
+    upper_bound = upper_bound_array[index]
 
-	JTEMP2 = find(x[JMAX_NEW].<MINJ[JMAX_NEW])
-	x[JTEMP2] = MAXJ[JTEMP2]
+    if (value<lower_bound)
+      new_parameter_array[index] = lower_bound+epsilon*upper_bound
+    elseif (value>upper_bound)
+      new_parameter_array[index] = upper_bound - epsilon*lower_bound
+    end
+  end
 
-	CHKMAX = find(x.>MAXJ);
-	x[CHKMAX] = MINJ[CHKMAX];
-
-	CHKMIN = find(x.<MINJ);
-	x[CHKMIN] = MAXJ[CHKMIN];
-
-  return x
+  return new_parameter_array
 end
