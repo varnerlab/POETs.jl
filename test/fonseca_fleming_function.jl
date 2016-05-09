@@ -65,9 +65,9 @@ function parameter_bounds_function(parameter_array,lower_bound_array,upper_bound
     upper_bound = upper_bound_array[index]
 
     if (value<lower_bound)
-      new_parameter_array[index] = lower_bound+epsilon*upper_bound
+      new_parameter_array[index] = lower_bound
     elseif (value>upper_bound)
-      new_parameter_array[index] = upper_bound - epsilon*lower_bound
+      new_parameter_array[index] = upper_bound
     end
   end
 
