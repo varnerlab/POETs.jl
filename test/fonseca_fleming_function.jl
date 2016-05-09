@@ -18,8 +18,8 @@ function objective_function(parameter_array)
   sum_2 = 0.0
   for index in collect(1:number_of_parameters)
 
-    sum_1 =+ (parameter_array[index] - 1/sqrt(number_of_parameters))^2
-    sum_2 =+ (parameter_array[index] + 1/sqrt(number_of_parameters))^2
+    sum_1 = sum_1 + (parameter_array[index] - 1/sqrt(number_of_parameters))^2
+    sum_2 = sum_2 + (parameter_array[index] + 1/sqrt(number_of_parameters))^2
   end
 
   # objectives -
@@ -33,7 +33,7 @@ end
 # Generates new parameter array, given current array -
 function neighbor_function(parameter_array)
 
-  SIGMA = 0.1
+  SIGMA = 0.05
   number_of_parameters = length(parameter_array)
 
   # calculate new parameters -

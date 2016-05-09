@@ -33,7 +33,7 @@ using Debug
 
   # internal parameters -
   temperature = 1.0
-  temperature_min = temperature/1000
+  temperature_min = temperature/10000
   alpha = 0.90
 
   # Grab the initial parameters -
