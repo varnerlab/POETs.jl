@@ -33,7 +33,7 @@ using Debug
 
   # internal parameters -
   temperature = 1.0
-  temperature_min = temperature/10000
+  temperature_min = temperature/1000
   alpha = 0.90
 
   # Grab the initial parameters -
@@ -88,8 +88,10 @@ using Debug
         parameter_array_best = test_parameter_array
 
         if (show_trace == true)
-          @show iteration_index,temperature
+          #@show iteration_index,temperature
         end
+
+        @show iteration_index,temperature
       end
 
       # check - should we go around again?
