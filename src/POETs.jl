@@ -28,7 +28,7 @@ module POETs
   # include the main -
   include("Main.jl")
 
-  # Export the Estimate function -
-  export estimate_ensemble;
+  # Export the estimate and rank functions -
+  export estimate_ensemble,rank_function
 
 end

@@ -19,4 +19,4 @@ To test the POETs installation use:
 ```
 Pkg.test("POETs")
 ```
-which runs test examples in the ``test`` directory.
+which runs test examples from the ``test`` directory.
