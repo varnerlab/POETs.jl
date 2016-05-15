@@ -51,6 +51,13 @@ function acceptance_probability_function(rank_array,temperature)
   return (exp(-rank_array[end]/temperature))
 end
 
+function cooling_function(temperature)
+
+  # define my new temperature -
+  alpha = 0.9
+  return 0.9*temperature
+end
+
 # Helper functions -
 function parameter_bounds_function(parameter_array,lower_bound_array,upper_bound_array)
 

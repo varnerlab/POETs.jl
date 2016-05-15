@@ -23,16 +23,18 @@
  * Created by jeffreyvarner on 5/4/2016
  =#
 
-function estimate_ensemble(objective_function::Function,neighbor_function::Function,acceptance_probability_function::Function,
-  initial_state::Array{Float64,1};maximum_number_of_iterations=20,rank_cutoff=5.0,show_trace=true)
+function estimate_ensemble(objective_function::Function,neighbor_function::Function,acceptance_probability_function::Function,cooling_function::Function,
+  initial_state::Array{Float64,1};maximum_number_of_iterations=20,rank_cutoff=5.0,temperature_minimum=0.0001,show_trace=true)
 
-  # check function arguments
-  # ...
+  # check function arguments -
+  if objective_function == 0 || typeof(objective_function) != :Function
+    error_string = "ERROR: Missing user defined objective function"
+    throw(error_string)
+  end
 
   # internal parameters -
   temperature = 1.0
-  temperature_min = temperature/10000
-  alpha = 0.90
+  #temperature_min = temperature/10000
 
   # Grab the initial parameters -
   parameter_array_best = initial_state
@@ -100,7 +102,7 @@ function estimate_ensemble(objective_function::Function,neighbor_function::Funct
     end # end: inner while-loop (iterations)
 
     # update the temperature -
-    temperature = alpha*temperature
+    temperature = cooling_function(temperature)
 
   end # end: outer while-loop (temperature)
 
@@ -112,14 +114,14 @@ end
 function rank_function(error_cache)
 
   # Get the size of the error cache -
-  (number_of_objectives,number_of_trials) = size(error_cache);
+  (number_of_objectives,number_of_trials) = size(error_cache)
 
   # initialize -
-  rank_array = zeros(number_of_trials);
+  rank_array = zeros(number_of_trials)
 
   # Setup the index vectors -
-  trial_index_array = collect(1:number_of_trials);
-  objective_index_array = collect(1:number_of_objectives);
+  trial_index_array = collect(1:number_of_trials)
+  objective_index_array = collect(1:number_of_objectives)
 
   # main rank loop -
   for trial_index in trial_index_array
@@ -129,15 +131,15 @@ function rank_function(error_cache)
     for objective_index in objective_index_array
 
       # index of dominated -
-      index_of_dominated_sets = find(error_cache[objective_index,dominated_population_array].<=error_cache[objective_index,trial_index]);
+      index_of_dominated_sets = find(error_cache[objective_index,dominated_population_array].<=error_cache[objective_index,trial_index])
 
       # update -
-      dominated_population_array = dominated_population_array[index_of_dominated_sets];
+      dominated_population_array = dominated_population_array[index_of_dominated_sets]
     end
 
     # update -
-    rank_array[trial_index] = length(dominated_population_array) - 1;
+    rank_array[trial_index] = length(dominated_population_array) - 1
   end
 
-  return rank_array;
+  return rank_array
 end
