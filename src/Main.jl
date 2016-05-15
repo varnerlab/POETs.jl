@@ -24,17 +24,10 @@
  =#
 
 function estimate_ensemble(objective_function::Function,neighbor_function::Function,acceptance_probability_function::Function,cooling_function::Function,
-  initial_state::Array{Float64,1};maximum_number_of_iterations=20,rank_cutoff=5.0,temperature_minimum=0.0001,show_trace=true)
-
-  # check function arguments -
-  if objective_function == 0 || typeof(objective_function) != :Function
-    error_string = "ERROR: Missing user defined objective function"
-    throw(error_string)
-  end
+  initial_state::Array{Float64,1};maximum_number_of_iterations=20,rank_cutoff=5.0,temperature_min=0.0001,show_trace=true)
 
   # internal parameters -
   temperature = 1.0
-  #temperature_min = temperature/10000
 
   # Grab the initial parameters -
   parameter_array_best = initial_state
