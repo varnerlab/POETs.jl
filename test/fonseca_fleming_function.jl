@@ -55,7 +55,7 @@ function cooling_function(temperature)
 
   # define my new temperature -
   alpha = 0.9
-  return 0.9*temperature
+  return alpha*temperature
 end
 
 # Helper functions -
