@@ -19,4 +19,11 @@ To test the POETs installation use:
 ```
 Pkg.test("POETs")
 ```
-which runs test examples from the ``test`` directory.
+which runs test examples from the ``test`` directory. Lastly, to delete the JuPOETs package use the command:
+
+```
+Pkg.rm("POETs")
+```
+
+## Sample code
+We've included sample code to help you get started with JuPOETs in your project. The sample can be found in the ``sample/biochemical`` subdirectory. The sample encodes the estimation of an ensemble of biochemical model parameters from four conflicting training data sets. The driver for this sample is given in the ``run_biochemical_test.jl`` file, while the ``objective``,``neighbor``,``cooling`` and ``acceptance`` functions (required by JuPOETs) are encoded in the ``hcmem_lib.jl`` library.
