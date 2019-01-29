@@ -71,7 +71,8 @@ function estimate_ensemble(objective_function::Function,neighbor_function::Funct
       if (acceptance_probability>rand())
 
         # Select the rank -
-        archive_select_index = find(pareto_rank_array.<rank_cutoff)
+        #archive_select_index = find(pareto_rank_array.<rank_cutoff)
+	archive_select_index = findall(pareto_rank_array.<rank_cutoff)
 
         # update the caches -
         error_cache = error_cache[:,archive_select_index]
@@ -124,7 +125,8 @@ function rank_function(error_cache)
     for objective_index in objective_index_array
 
       # index of dominated -
-      index_of_dominated_sets = find(error_cache[objective_index,dominated_population_array].<=error_cache[objective_index,trial_index])
+	#index_of_dominated_sets = find(error_cache[objective_index,dominated_population_array].<=error_cache[objective_index,trial_index])
+      index_of_dominated_sets = findall(error_cache[objective_index,dominated_population_array].<=error_cache[objective_index,trial_index])
 
       # update -
       dominated_population_array = dominated_population_array[index_of_dominated_sets]
