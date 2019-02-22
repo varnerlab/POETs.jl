@@ -1,4 +1,4 @@
-using Debug
+#using Debug
 
 # some global parameters -
 BIG = 1e10
@@ -38,7 +38,7 @@ function neighbor_function(parameter_array)
   number_of_parameters = length(parameter_array)
 
   # calculate new parameters -
-  new_parameter_array = parameter_array.*(1+SIGMA*randn(number_of_parameters))
+  new_parameter_array = parameter_array.*(fill(1, number_of_parameters)+SIGMA*randn(number_of_parameters))
 
   # Check the bound constraints -
   LOWER_BOUND = [0,0]
