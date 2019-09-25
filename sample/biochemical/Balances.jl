@@ -3,7 +3,7 @@ include("Control.jl")
 
 function Balances(t,x,dxdt_vector,DF)
 
-  idx = find(x.<1e-9)
+  idx = findall(x.<1e-9)
   x[idx] = 1e-9
 
   # Alias the species vector -
