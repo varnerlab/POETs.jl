@@ -5,7 +5,7 @@ ec_array_full = load("./data/ec_array.dat")
 rank_array = load("./data/rank_array.dat")
 
 % What is the ensemble?
-idx_rank = find(rank_array==0)
+idx_rank = findall(rank_array==0)
 ec_array_R0 = ec_array_full(:,idx_rank)
 
 # How big is the ensemble -
@@ -24,7 +24,7 @@ ec_array_R0 = ec_array_full(:,idx_rank)
 % end
 
 % What is the ensemble?
-idx_rank = find(rank_array==1)
+idx_rank = findall(rank_array==1)
 ec_array_R1 = ec_array_full(:,idx_rank)
 
 % # How big is the ensemble -

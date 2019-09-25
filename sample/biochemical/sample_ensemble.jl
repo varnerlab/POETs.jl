@@ -10,7 +10,7 @@ pc_array_full = readdlm("./data/pc_array.dat")
 rank_array = readdlm("./data/rank_array.dat")
 
 # Select the desired rank -
-idx_rank = find(rank_array .<= 0.0)
+idx_rank = findall(rank_array .<= 0.0)
 
 # Setup time scale -
 tStart = 0.0;
@@ -55,7 +55,7 @@ SF = (2.58/sqrt(number_of_samples))
 
 UB = mean_value + (SF)*std_value
 LB = mean_value - (SF)*std_value
-idx_z = find(LB.<0)
+idx_z = findall(LB.<0)
 LB[idx_z] = 0.0
 
 # Make the plot -
