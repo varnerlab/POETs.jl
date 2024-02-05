@@ -1,0 +1,4 @@
+name = "POETS"
+uuid = "96df2fbe-54ee-416b-bcba-e6fc22a57c08"
+authors = ["Jeffrey Varner <jdv27@cornell.edu>"]
+version = "0.1.0"
