@@ -23,33 +23,25 @@
  * Created by jeffreyvarner on 5/4/2016
  =#
 
-function estimate_ensemble(objective_function::Function,neighbor_function::Function,acceptance_probability_function::Function,cooling_function::Function,
-  initial_state::Array{Float64,1};maximum_number_of_iterations=20,rank_cutoff=5.0,temperature_min=0.0001,show_trace=true)
+# -- PUBLIC FUNCTIONS BELOW HERE ------------------------------------------------------------------------------------------------------------ #
+function estimate_ensemble(objective_function::Function,neighbor_function::Function,
+  acceptance_probability_function::Function, cooling_function::Function,
+  initial_state::Array{Float64,1}; maximum_number_of_iterations::Int64 = 20,
+  rank_cutoff::Float64 = 5.0, temperature_min::Float64 = 0.0001, show_trace::Bool = true)
 
-  # internal parameters -
-  temperature = 1.0
-
-  # Grab the initial parameters -
-  parameter_array_best = initial_state
-
-  # initialize error cache -
-  error_cache = objective_function(parameter_array_best)
-
-  # initialize parameter_cache -
-  parameter_cache = parameter_array_best
-
-  # initialize the Pareto rank array from the error_cache -
-  pareto_rank_array = rank_function(error_cache)
-
-  # how many objectives do we have?
-  number_of_objectives = length(error_cache)
+  # initialize -
+  temperature = 1.0;                                        # set initial temperature
+  parameter_array_best = initial_state;                     # grab the initial parameters
+  error_cache = objective_function(parameter_array_best);   # initialize the error cache
+  parameter_cache = parameter_array_best;                   # initialize parameter_cache
+  pareto_rank_array = rank_function(error_cache);           # compute the pareto rank for the error_cache
 
   # main loop -
-  while (temperature>temperature_min)
+  while (temperature > temperature_min)
 
-    should_loop_continue::Bool = true;
+    should_loop_continue = true;
     iteration_index = 1
-    while (should_loop_continue)
+    while (should_loop_continue == true)
 
       # generate a new solution -
       test_parameter_array = neighbor_function(parameter_array_best)
@@ -57,10 +49,10 @@ function estimate_ensemble(objective_function::Function,neighbor_function::Funct
       # evaluate the new solution -
       test_error = objective_function(test_parameter_array)
 
-      # Add the test error to the error cache -
+      # add the test error to the error cache -
       error_cache = [error_cache test_error]
 
-      # Add parameters to parameter cache -
+      # add parameters to parameter cache -
       parameter_cache = [parameter_cache test_parameter_array]
 
       # compute the Pareto rank for the error_cache -
@@ -68,11 +60,10 @@ function estimate_ensemble(objective_function::Function,neighbor_function::Funct
 
       # do we accept the new solution?
       acceptance_probability = acceptance_probability_function(pareto_rank_array,temperature)
-      if (acceptance_probability>rand())
+      if (acceptance_probability > rand())
 
         # Select the rank -
-        #archive_select_index = find(pareto_rank_array.<rank_cutoff)
-	archive_select_index = findall(pareto_rank_array.<rank_cutoff)
+	      archive_select_index = findall(pareto_rank_array.<rank_cutoff)
 
         # update the caches -
         error_cache = error_cache[:,archive_select_index]
@@ -80,19 +71,18 @@ function estimate_ensemble(objective_function::Function,neighbor_function::Funct
 
         # update the parameters -
         parameter_array_best = test_parameter_array
-
         if (show_trace == true)
           @show iteration_index,temperature
         end
       end
 
       # check - should we go around again?
-      if (iteration_index>maximum_number_of_iterations)
+      if (iteration_index > maximum_number_of_iterations)
         should_loop_continue = false;
-      end;
-
-      # update the loop index -
-      iteration_index+=1;
+      else
+        # update the loop index -
+        iteration_index += 1;
+      end
     end # end: inner while-loop (iterations)
 
     # update the temperature -
@@ -107,15 +97,11 @@ end
 # Pareto ranking function -
 function rank_function(error_cache)
 
-  # Get the size of the error cache -
-  (number_of_objectives,number_of_trials) = size(error_cache)
-
-  # initialize -
-  rank_array = zeros(number_of_trials)
-
-  # Setup the index vectors -
-  trial_index_array = collect(1:number_of_trials)
-  objective_index_array = collect(1:number_of_objectives)
+   # initialize -
+  (number_of_objectives,number_of_trials) = size(error_cache); # Get the size of the error cache -
+  rank_array = zeros(number_of_trials); # initialize the rank array -
+  trial_index_array = collect(1:number_of_trials); # Setup the index vectors -
+  objective_index_array = collect(1:number_of_objectives); # Setup the objective_index_array
 
   # main rank loop -
   for trial_index in trial_index_array
@@ -125,8 +111,7 @@ function rank_function(error_cache)
     for objective_index in objective_index_array
 
       # index of dominated -
-	#index_of_dominated_sets = find(error_cache[objective_index,dominated_population_array].<=error_cache[objective_index,trial_index])
-      index_of_dominated_sets = findall(error_cache[objective_index,dominated_population_array].<=error_cache[objective_index,trial_index])
+      index_of_dominated_sets = findall(error_cache[objective_index, dominated_population_array].<= error_cache[objective_index,trial_index])
 
       # update -
       dominated_population_array = dominated_population_array[index_of_dominated_sets]
@@ -138,3 +123,4 @@ function rank_function(error_cache)
 
   return rank_array
 end
+# -- PUBLIC FUNCTIONS ABOVE HERE ------------------------------------------------------------------------------------------------------------ #
