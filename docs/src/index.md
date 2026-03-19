@@ -1,22 +1,22 @@
-# POETs.jl
+# ParetoEnsembles.jl
 
 **Pareto Optimal Ensemble Techniques for multiobjective optimization in Julia.**
 
-POETs.jl implements a simulated annealing algorithm combined with Pareto ranking to generate ensembles of near-optimal solutions for multiobjective optimization problems. Rather than returning a single "best" solution, POETs produces an archive of solutions that approximate the Pareto front — the set of solutions where no objective can be improved without worsening another.
+ParetoEnsembles.jl implements a simulated annealing algorithm combined with Pareto ranking to generate ensembles of near-optimal solutions for multiobjective optimization problems. Rather than returning a single "best" solution, ParetoEnsembles produces an archive of solutions that approximate the Pareto front — the set of solutions where no objective can be improved without worsening another.
 
 ## Installation
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/varnerlab/POETs.jl")
+Pkg.add(url="https://github.com/varnerlab/ParetoEnsembles.jl")
 ```
 
 ## Quick Start
 
-POETs requires four user-defined callback functions:
+ParetoEnsembles requires four user-defined callback functions:
 
 ```julia
-using POETs
+using ParetoEnsembles
 
 # Define your problem-specific functions:
 # objective_function(params)    -> n_objectives × 1 error array
@@ -43,5 +43,5 @@ optimal_idx = findall(rank_array .== 0)
 
 ## References
 
-- Song S, Chakrabarti A, and J. Varner (2010). Identifying ensembles of signal transduction models using Pareto Optimal Ensemble Techniques (POETs). *Biotechnology Journal*. DOI: [10.1002/biot.201000059](http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3021968/)
-- Bassen D, Vilkhovoy M, Minot M, Butcher J and J. Varner (2016). JuPOETs: A Constrained Multiobjective Optimization Approach to Estimate Biochemical Model Ensembles in the Julia Programming Language. *bioRxiv*. DOI: [10.1101/056044](http://biorxiv.org/content/early/2016/05/30/056044)
+- Song S, Chakrabarti A, and J. Varner (2010). Identifying ensembles of signal transduction models using Pareto Optimal Ensemble Techniques (ParetoEnsembles). *Biotechnology Journal*. DOI: [10.1002/biot.201000059](http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3021968/)
+- Bassen D, Vilkhovoy M, Minot M, Butcher J and J. Varner (2016). JuParetoEnsembles: A Constrained Multiobjective Optimization Approach to Estimate Biochemical Model Ensembles in the Julia Programming Language. *bioRxiv*. DOI: [10.1101/056044](http://biorxiv.org/content/early/2016/05/30/056044)

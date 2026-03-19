@@ -1,6 +1,6 @@
 # Tutorial: Binh-Korn Benchmark
 
-This tutorial walks through solving the Binh-Korn constrained multiobjective optimization problem using POETs.jl.
+This tutorial walks through solving the Binh-Korn constrained multiobjective optimization problem using ParetoEnsembles.jl.
 
 ## Problem Definition
 
@@ -75,7 +75,7 @@ end
 ## Step 4: Run the Optimization
 
 ```julia
-using POETs
+using ParetoEnsembles
 
 initial_state = [2.5, 1.5]
 

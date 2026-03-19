@@ -1,6 +1,6 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
-POETs = "5a671d39-efd4-4f73-b77d-a08726cdc8b7"
+ParetoEnsembles = "5a671d39-efd4-4f73-b77d-a08726cdc8b7"
 
 [compat]
 Documenter = "1"

@@ -1,5 +1,5 @@
 # Estimates model parameters for proof-of-concept biochemical model -
-using POETs
+using ParetoEnsembles
 include("hcmem_lib.jl")
 
 function test_biochemical_model()

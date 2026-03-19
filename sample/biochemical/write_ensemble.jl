@@ -1,4 +1,4 @@
-using POETs
+using ParetoEnsembles
 using DelimitedFiles
 
 # Script to write the model ensemble to disk -

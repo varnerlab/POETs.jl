@@ -1,8 +1,8 @@
 using Test
-using POETs
+using ParetoEnsembles
 using Random
 
-@testset "POETs.jl" begin
+@testset "ParetoEnsembles.jl" begin
 
     @testset "Binh-Korn benchmark" begin
         mod = Module(:BinhKorn)

@@ -1,9 +1,9 @@
-## POETs.jl - Pareto Optimal Ensemble Techniques
+## ParetoEnsembles.jl - Pareto Optimal Ensemble Techniques
 
 [![CI](https://github.com/varnerlab/POETs.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/varnerlab/POETs.jl/actions/workflows/CI.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-POETs.jl is a [Julia](https://julialang.org) package that implements the Pareto Optimal Ensemble Techniques (POETs) method for multiobjective optimization using simulated annealing with Pareto ranking.
+ParetoEnsembles.jl is a [Julia](https://julialang.org) package that implements the Pareto Optimal Ensemble Techniques (POETs) method for multiobjective optimization using simulated annealing with Pareto ranking.
 
 ### References
 
@@ -20,10 +20,10 @@ Pkg.add(url="https://github.com/varnerlab/POETs.jl")
 ## Usage
 
 ```julia
-using POETs
+using ParetoEnsembles
 ```
 
-POETs requires four user-defined callback functions:
+ParetoEnsembles requires four user-defined callback functions:
 
 | Function | Signature | Purpose |
 |----------|-----------|---------|
@@ -71,5 +71,5 @@ Test problems (Binh-Korn and Fonseca-Fleming benchmarks) are in the `test/` dire
 
 ```julia
 using Pkg
-Pkg.test("POETs")
+Pkg.test("ParetoEnsembles")
 ```

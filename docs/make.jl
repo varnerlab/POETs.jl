@@ -1,9 +1,9 @@
 using Documenter
-using POETs
+using ParetoEnsembles
 
 makedocs(
-    sitename = "POETs.jl",
-    modules = [POETs],
+    sitename = "ParetoEnsembles.jl",
+    modules = [ParetoEnsembles],
     authors = "Jeffrey Varner <jdv27@cornell.edu>",
     format = Documenter.HTML(
         canonical = "https://varnerlab.github.io/POETs.jl",

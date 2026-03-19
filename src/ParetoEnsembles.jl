@@ -23,7 +23,7 @@
  * Created by jeffreyvarner on 5/4/2016
  =#
 
-module POETs
+module ParetoEnsembles
 
   using Random
 
