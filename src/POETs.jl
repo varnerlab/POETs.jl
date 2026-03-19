@@ -25,10 +25,12 @@
 
 module POETs
 
+  using Random
+
   # include the main -
   include("Main.jl")
 
   # Export the estimate and rank functions -
-  export estimate_ensemble,rank_function
+  export estimate_ensemble, rank_function
 
 end
