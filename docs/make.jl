@@ -17,6 +17,6 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/varnerlab/POETs.jl.git",
+    repo = "github.com/varnerlab/ParetoEnsembles.jl.git",
     devbranch = "master",
 )
