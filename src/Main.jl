@@ -47,6 +47,8 @@ acceptance probability. Solutions with rank below `rank_cutoff` are retained in 
 - `temperature_min::Real = 0.0001`: annealing stops when temperature falls below this value.
 - `show_trace::Bool = true`: print iteration and temperature at each accepted step.
 - `rng::AbstractRNG = Random.default_rng()`: random number generator for reproducibility.
+- `maximum_archive_size::Integer = 1000`: hard cap on archive size; if exceeded after pruning, only the best-ranked solutions are kept.
+- `parallel_evaluation::Bool = false`: use threaded Pareto ranking. Requires Julia started with multiple threads (`julia -t N`).
 
 # Returns
 A tuple `(error_cache, parameter_cache, pareto_rank_array)` where:
@@ -60,7 +62,8 @@ using Random
 rng = MersenneTwister(42)  # for reproducibility
 (EC, PC, RA) = estimate_ensemble(
     obj_fn, neighbor_fn, accept_fn, cool_fn, x0;
-    rank_cutoff=4.0, maximum_number_of_iterations=40, rng=rng
+    rank_cutoff=4.0, maximum_number_of_iterations=40, rng=rng,
+    maximum_archive_size=500
 )
 ```
 
@@ -70,7 +73,12 @@ function estimate_ensemble(objective_function::Function, neighbor_function::Func
   acceptance_probability_function::Function, cooling_function::Function,
   initial_state::AbstractVector{<:Real}; maximum_number_of_iterations::Integer = 20,
   rank_cutoff::Real = 5.0, temperature_min::Real = 0.0001, show_trace::Bool = true,
-  rng::AbstractRNG = Random.default_rng())
+  rng::AbstractRNG = Random.default_rng(), maximum_archive_size::Integer = 1000,
+  parallel_evaluation::Bool = false)
+
+  # select serial or threaded ranking functions
+  _rank_fn = parallel_evaluation ? _rank_columns_threaded : _rank_columns
+  _insert_fn! = parallel_evaluation ? _rank_insert_threaded! : _rank_insert!
 
   # initialize — use column vectors to avoid hcat copies in the inner loop
   temperature = 1.0
@@ -79,6 +87,7 @@ function estimate_ensemble(objective_function::Function, neighbor_function::Func
 
   error_cols = Vector{Float64}[first_error]
   param_cols = Vector{Float64}[copy(parameter_array_best)]
+  rank_array = zeros(1)  # initial solution has rank 0
 
   # main loop -
   while temperature > temperature_min
@@ -89,27 +98,47 @@ function estimate_ensemble(objective_function::Function, neighbor_function::Func
       test_parameter_array = neighbor_function(parameter_array_best)
       test_error = vec(objective_function(test_parameter_array))
 
-      # append to archive -
+      # save ranks before insertion (for cheap restore on reject)
+      old_ranks = copy(rank_array)
+
+      # temporarily append candidate to archive -
       push!(error_cols, test_error)
       push!(param_cols, test_parameter_array)
 
-      # compute the Pareto rank -
-      pareto_rank_array = _rank_columns(error_cols)
+      # incremental rank update — O(n·m) instead of O(n²·m)
+      _insert_fn!(error_cols, rank_array)
 
       # do we accept the new solution?
-      acceptance_probability = acceptance_probability_function(pareto_rank_array, temperature)
+      acceptance_probability = acceptance_probability_function(rank_array, temperature)
       if acceptance_probability > rand(rng)
 
         # prune archive to solutions below rank cutoff -
-        keep = findall(pareto_rank_array .< rank_cutoff)
+        keep = findall(rank_array .< rank_cutoff)
         error_cols = error_cols[keep]
         param_cols = param_cols[keep]
+
+        # full re-rank after prune (archive is small post-prune)
+        rank_array = _rank_fn(error_cols)
+
+        # enforce hard archive size cap -
+        if length(error_cols) > maximum_archive_size
+          perm = sortperm(rank_array)
+          keep_cap = perm[1:maximum_archive_size]
+          error_cols = error_cols[keep_cap]
+          param_cols = param_cols[keep_cap]
+          rank_array = _rank_fn(error_cols)
+        end
 
         # update the parameters -
         parameter_array_best = test_parameter_array
         if show_trace
           @show iteration_index, temperature
         end
+      else
+        # rejected — remove candidate and restore ranks
+        pop!(error_cols)
+        pop!(param_cols)
+        rank_array = old_ranks
       end
     end
 
@@ -135,21 +164,132 @@ function _rank_columns(cols::Vector{Vector{Float64}})
   @inbounds for i in 1:n_trials
     count = 0
     for j in 1:n_trials
-      # check if solution j weakly dominates solution i (j <= i in all objectives)
+      # check if solution j strictly dominates solution i
+      # (j <= i in all objectives AND j < i in at least one)
       dominates = true
+      strictly_better = false
       for k in 1:n_obj
         if cols[j][k] > cols[i][k]
           dominates = false
           break
+        elseif cols[j][k] < cols[i][k]
+          strictly_better = true
         end
       end
-      if dominates
+      if dominates && strictly_better
         count += 1
       end
     end
-    rank_array[i] = count - 1  # subtract self
+    rank_array[i] = count
   end
 
+  return rank_array
+end
+
+# Internal: incremental rank update when one new solution is appended — O(n·m)
+function _rank_insert!(cols::Vector{Vector{Float64}}, rank_array::Vector{Float64})
+  n = length(cols)
+  n_obj = length(cols[1])
+  new_rank = 0.0
+
+  @inbounds for i in 1:(n - 1)
+    dom_new_over_i = true
+    strict_new = false
+    dom_i_over_new = true
+    strict_i = false
+
+    for k in 1:n_obj
+      val_new = cols[n][k]
+      val_i = cols[i][k]
+      if val_new > val_i
+        dom_new_over_i = false
+      elseif val_new < val_i
+        strict_new = true
+      end
+      if val_i > val_new
+        dom_i_over_new = false
+      elseif val_i < val_new
+        strict_i = true
+      end
+    end
+
+    if dom_new_over_i && strict_new
+      rank_array[i] += 1
+    end
+    if dom_i_over_new && strict_i
+      new_rank += 1
+    end
+  end
+
+  push!(rank_array, new_rank)
+  return rank_array
+end
+
+# Internal: threaded full Pareto rank — O(n²·m / nthreads)
+function _rank_columns_threaded(cols::Vector{Vector{Float64}})
+  n_trials = length(cols)
+  n_obj = length(cols[1])
+  rank_array = zeros(n_trials)
+
+  Threads.@threads for i in 1:n_trials
+    count = 0
+    @inbounds for j in 1:n_trials
+      dominates = true
+      strictly_better = false
+      for k in 1:n_obj
+        if cols[j][k] > cols[i][k]
+          dominates = false
+          break
+        elseif cols[j][k] < cols[i][k]
+          strictly_better = true
+        end
+      end
+      if dominates && strictly_better
+        count += 1
+      end
+    end
+    rank_array[i] = count
+  end
+
+  return rank_array
+end
+
+# Internal: threaded incremental rank update — O(n·m / nthreads)
+function _rank_insert_threaded!(cols::Vector{Vector{Float64}}, rank_array::Vector{Float64})
+  n = length(cols)
+  n_obj = length(cols[1])
+  new_rank = Threads.Atomic{Int}(0)
+
+  Threads.@threads for i in 1:(n - 1)
+    dom_new_over_i = true
+    strict_new = false
+    dom_i_over_new = true
+    strict_i = false
+
+    @inbounds for k in 1:n_obj
+      val_new = cols[n][k]
+      val_i = cols[i][k]
+      if val_new > val_i
+        dom_new_over_i = false
+      elseif val_new < val_i
+        strict_new = true
+      end
+      if val_i > val_new
+        dom_i_over_new = false
+      elseif val_i < val_new
+        strict_i = true
+      end
+    end
+
+    if dom_new_over_i && strict_new
+      rank_array[i] += 1
+    end
+    if dom_i_over_new && strict_i
+      Threads.atomic_add!(new_rank, 1)
+    end
+  end
+
+  push!(rank_array, Float64(new_rank[]))
   return rank_array
 end
 
@@ -184,21 +324,91 @@ function rank_function(error_cache)
   @inbounds for i in 1:n_trials
     count = 0
     for j in 1:n_trials
-      # check if solution j weakly dominates solution i
+      # check if solution j strictly dominates solution i
+      # (j <= i in all objectives AND j < i in at least one)
       dominates = true
+      strictly_better = false
       for k in 1:n_obj
         if error_cache[k, j] > error_cache[k, i]
           dominates = false
           break
+        elseif error_cache[k, j] < error_cache[k, i]
+          strictly_better = true
         end
       end
-      if dominates
+      if dominates && strictly_better
         count += 1
       end
     end
-    rank_array[i] = count - 1  # subtract self
+    rank_array[i] = count
   end
 
   return rank_array
+end
+
+"""
+    estimate_ensemble_parallel(objective_function, neighbor_function, acceptance_probability_function, cooling_function, initial_states; kwargs...)
+
+Run multiple independent Pareto simulated annealing chains in parallel, then merge their archives.
+
+Each element of `initial_states` seeds one chain that runs `estimate_ensemble` on its own thread.
+Results are merged into a single archive and re-ranked. This gives near-linear speedup with
+thread count and better Pareto front coverage from diverse starting points.
+
+Requires Julia started with multiple threads (`julia -t N`).
+
+# Arguments
+- `objective_function`, `neighbor_function`, `acceptance_probability_function`, `cooling_function`: same as [`estimate_ensemble`](@ref).
+- `initial_states::AbstractVector{<:AbstractVector{<:Real}}`: one starting parameter vector per chain.
+
+# Keyword Arguments
+All keyword arguments from [`estimate_ensemble`](@ref) are supported and forwarded to each chain.
+The `rng` kwarg is ignored; each chain gets its own deterministic RNG seeded from `rng_seed` and the chain index.
+- `rng_seed::Integer = 42`: base seed for per-chain RNG generation.
+
+# Returns
+Same as [`estimate_ensemble`](@ref): `(error_cache, parameter_cache, pareto_rank_array)` for the merged archive.
+
+# Example
+```julia
+starts = [[2.5, 1.5], [1.0, 2.0], [3.0, 1.0], [4.0, 0.5]]
+(EC, PC, RA) = estimate_ensemble_parallel(
+    obj_fn, neighbor_fn, accept_fn, cool_fn, starts;
+    rank_cutoff=4.0, maximum_number_of_iterations=40
+)
+```
+
+See also [`estimate_ensemble`](@ref).
+"""
+function estimate_ensemble_parallel(objective_function::Function,
+  neighbor_function::Function,
+  acceptance_probability_function::Function,
+  cooling_function::Function,
+  initial_states::AbstractVector{<:AbstractVector{<:Real}};
+  rng_seed::Integer = 42, kwargs...)
+
+  n_chains = length(initial_states)
+  results = Vector{Any}(undef, n_chains)
+
+  # filter out rng from kwargs — each chain gets its own
+  fwd_kwargs = Dict{Symbol,Any}(k => v for (k, v) in kwargs if k !== :rng)
+
+  Threads.@threads for c in 1:n_chains
+    chain_rng = MersenneTwister(hash((rng_seed, c)))
+    results[c] = estimate_ensemble(
+      objective_function, neighbor_function,
+      acceptance_probability_function, cooling_function,
+      initial_states[c]; rng=chain_rng, fwd_kwargs...
+    )
+  end
+
+  # merge all archives
+  all_errors = reduce(hcat, [r[1] for r in results])
+  all_params = reduce(hcat, [r[2] for r in results])
+
+  # re-rank the merged archive
+  merged_ranks = rank_function(all_errors)
+
+  return (all_errors, all_params, merged_ranks)
 end
 # -- PUBLIC FUNCTIONS ABOVE HERE ------------------------------------------------------------------------------------------------------------ #

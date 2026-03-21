@@ -4,5 +4,6 @@
 
 ```@docs
 estimate_ensemble
+estimate_ensemble_parallel
 rank_function
 ```

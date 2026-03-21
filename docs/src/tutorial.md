@@ -109,6 +109,48 @@ pareto_f2 = EC[2, pareto_idx]
 pareto_params = PC[:, pareto_idx]
 ```
 
+## Step 6: Enable Threaded Ranking
+
+For large archives, enable threaded Pareto ranking by setting `parallel_evaluation=true`:
+
+```julia
+(EC, PC, RA) = estimate_ensemble(
+    objective_function,
+    neighbor_function,
+    acceptance_probability_function,
+    cooling_function,
+    initial_state;
+    rank_cutoff = 4.0,
+    maximum_number_of_iterations = 40,
+    show_trace = false,
+    parallel_evaluation = true  # requires julia -t N
+)
+```
+
+## Step 7: Multi-Chain Parallel Search
+
+For better Pareto front coverage, run multiple independent chains in parallel using [`estimate_ensemble_parallel`](@ref). Each starting point spawns one chain:
+
+```julia
+initial_states = [[2.5, 1.5], [0.5, 2.5], [4.0, 0.5], [1.0, 1.0]]
+
+(EC, PC, RA) = estimate_ensemble_parallel(
+    objective_function,
+    neighbor_function,
+    acceptance_probability_function,
+    cooling_function,
+    initial_states;
+    rank_cutoff = 4.0,
+    maximum_number_of_iterations = 40,
+    show_trace = false,
+    rng_seed = 42  # base seed for reproducibility
+)
+
+println("Solutions from $(length(initial_states)) chains: ", size(EC, 2))
+pareto_idx = findall(RA .== 0)
+println("Pareto-optimal: ", length(pareto_idx))
+```
+
 ## Biochemical Example
 
 For a more realistic application, see the `sample/biochemical/` directory in the repository.

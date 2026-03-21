@@ -74,10 +74,17 @@ using Random
         @test ranks_h[2] == 0  # Pareto optimal
         @test ranks_h[3] == 0  # also non-dominated (tradeoff)
 
-        # Identical solutions: each is dominated by (n-1) others (all are <=)
+        # Identical solutions: no solution strictly dominates another
         identical = [1.0 1.0 1.0; 1.0 1.0 1.0]
         ranks_id = rank_function(identical)
-        @test all(ranks_id .== length(ranks_id) - 1)
+        @test all(ranks_id .== 0)
+
+        # Two identical + one dominated: identical pair should both be rank 0
+        mixed = [1.0 1.0 2.0; 1.0 1.0 2.0]
+        ranks_m = rank_function(mixed)
+        @test ranks_m[1] == 0
+        @test ranks_m[2] == 0
+        @test ranks_m[3] == 2  # dominated by both identical solutions
     end
 
     @testset "Reproducibility with seeded RNG" begin
@@ -180,5 +187,109 @@ using Random
         )
         @test size(EC3, 1) == 2
         @test size(EC3, 2) >= 1  # at least one solution retained
+    end
+
+    @testset "Incremental rank (_rank_insert!) matches full rank" begin
+        for _ in 1:20
+            n_obj = rand(2:5)
+            n_sol = rand(3:15)
+            cols = [rand(n_obj) for _ in 1:n_sol]
+
+            # build up incrementally
+            inc_cols = Vector{Float64}[cols[1]]
+            inc_ranks = zeros(1)
+            for i in 2:n_sol
+                push!(inc_cols, cols[i])
+                ParetoEnsembles._rank_insert!(inc_cols, inc_ranks)
+            end
+
+            # full rank from scratch
+            full_ranks = ParetoEnsembles._rank_columns(cols)
+
+            @test inc_ranks == full_ranks
+        end
+    end
+
+    @testset "maximum_archive_size cap" begin
+        mod = Module(:BinhKornCap)
+        Base.include(mod, "binh_korn_function.jl")
+
+        (EC, PC, RA) = estimate_ensemble(
+            mod.objective_function, mod.neighbor_function,
+            mod.acceptance_probability_function, mod.cooling_function,
+            [2.5, 1.5];
+            rank_cutoff=1000, maximum_number_of_iterations=20,
+            temperature_min=0.5, show_trace=false,
+            maximum_archive_size=10
+        )
+        @test size(EC, 2) <= 10
+        @test size(EC, 1) == 2
+        @test all(RA .>= 0)
+    end
+
+    @testset "Threaded _rank_columns matches serial" begin
+        for _ in 1:10
+            cols = [rand(3) for _ in 1:20]
+            @test ParetoEnsembles._rank_columns(cols) == ParetoEnsembles._rank_columns_threaded(cols)
+        end
+    end
+
+    @testset "Threaded _rank_insert! matches serial" begin
+        for _ in 1:10
+            cols = [rand(3) for _ in 1:10]
+
+            # serial
+            r1 = zeros(1)
+            c1 = Vector{Float64}[cols[1]]
+            for i in 2:length(cols)
+                push!(c1, cols[i])
+                ParetoEnsembles._rank_insert!(c1, r1)
+            end
+
+            # threaded
+            r2 = zeros(1)
+            c2 = Vector{Float64}[cols[1]]
+            for i in 2:length(cols)
+                push!(c2, cols[i])
+                ParetoEnsembles._rank_insert_threaded!(c2, r2)
+            end
+
+            @test r1 == r2
+        end
+    end
+
+    @testset "parallel_evaluation flag" begin
+        mod = Module(:BinhKornPar)
+        Base.include(mod, "binh_korn_function.jl")
+
+        (EC, PC, RA) = estimate_ensemble(
+            mod.objective_function, mod.neighbor_function,
+            mod.acceptance_probability_function, mod.cooling_function,
+            [2.5, 1.5];
+            rank_cutoff=4, maximum_number_of_iterations=10,
+            temperature_min=0.5, show_trace=false,
+            parallel_evaluation=true
+        )
+        @test size(EC, 1) == 2
+        @test size(EC, 2) > 0
+        @test all(RA .>= 0)
+    end
+
+    @testset "estimate_ensemble_parallel multi-chain" begin
+        mod = Module(:BinhKornMulti)
+        Base.include(mod, "binh_korn_function.jl")
+
+        initial_states = [[2.5, 1.5], [1.0, 2.0], [3.0, 1.0]]
+
+        (EC, PC, RA) = estimate_ensemble_parallel(
+            mod.objective_function, mod.neighbor_function,
+            mod.acceptance_probability_function, mod.cooling_function,
+            initial_states;
+            rank_cutoff=4, maximum_number_of_iterations=10,
+            temperature_min=0.5, show_trace=false
+        )
+        @test size(EC, 1) == 2
+        @test size(EC, 2) >= 3  # at least one solution per chain
+        @test all(RA .>= 0)
     end
 end

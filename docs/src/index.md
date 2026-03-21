@@ -41,6 +41,25 @@ initial_params = rand(10)  # starting point
 optimal_idx = findall(rank_array .== 0)
 ```
 
+### Parallel Execution
+
+Run multiple chains in parallel for better Pareto front coverage (requires `julia -t N`):
+
+```julia
+starts = [rand(10) for _ in 1:4]  # one starting point per chain
+
+(EC, PC, RA) = estimate_ensemble_parallel(
+    objective_function,
+    neighbor_function,
+    acceptance_probability_function,
+    cooling_function,
+    starts;
+    rank_cutoff = 4.0,
+    maximum_number_of_iterations = 40,
+    show_trace = false
+)
+```
+
 ## References
 
 - Song S, Chakrabarti A, and J. Varner (2010). Identifying ensembles of signal transduction models using Pareto Optimal Ensemble Techniques (ParetoEnsembles). *Biotechnology Journal*. DOI: [10.1002/biot.201000059](http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3021968/)
