@@ -1,7 +1,7 @@
 name = "ParetoEnsembles"
 uuid = "5a671d39-efd4-4f73-b77d-a08726cdc8b7"
 authors = ["Jeffrey Varner <jdv27@cornell.edu>"]
-version = "0.1.0"
+version = "0.1.1"
 description = "Pareto Optimal Ensemble Techniques for multiobjective optimization"
 homepage = "https://github.com/varnerlab/ParetoEnsembles.jl"
 repository = "https://github.com/varnerlab/ParetoEnsembles.jl"
