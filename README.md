@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/varnerlab/ParetoEnsembles.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/varnerlab/ParetoEnsembles.jl/actions/workflows/CI.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Hypercommit](https://img.shields.io/badge/Hypercommit-DB2475)](https://hypercommit.com/paretoensembles-jl)
 
 ParetoEnsembles.jl is a [Julia](https://julialang.org) package that implements the Pareto Optimal Ensemble Techniques (POETs) method for multiobjective optimization using simulated annealing with Pareto ranking.
 
