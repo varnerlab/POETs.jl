@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "ParetoEnsembles.jl"
+type: software
+authors:
+  - family-names: Varner
+    given-names: Jeffrey D.
+    affiliation: "Cornell University"
+    email: jdv27@cornell.edu
+license: MIT
+repository-code: "https://github.com/varnerlab/ParetoEnsembles.jl"
+keywords:
+  - multiobjective optimization
+  - Pareto front
+  - simulated annealing
+  - ensemble methods
+  - Julia
+  - parameter estimation

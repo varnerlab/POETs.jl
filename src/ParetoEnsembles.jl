@@ -31,6 +31,6 @@ module ParetoEnsembles
   include("Main.jl")
 
   # Export the estimate and rank functions -
-  export estimate_ensemble, estimate_ensemble_parallel, rank_function
+  export estimate_ensemble, estimate_ensemble_parallel, rank_function, hypervolume, pareto_front
 
 end

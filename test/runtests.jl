@@ -292,4 +292,84 @@ using Random
         @test size(EC, 2) >= 3  # at least one solution per chain
         @test all(RA .>= 0)
     end
+
+    @testset "hypervolume" begin
+        # Two non-dominated points: (1,3) and (3,1) with ref (4,4)
+        # Sorted by f1: (1,3), (3,1)
+        # (1,3) contributes (3-1)*(4-3) = 2
+        # (3,1) contributes (4-3)*(4-1) = 3 → total = 5
+        E = [1.0 3.0; 3.0 1.0]
+        @test hypervolume(E, [4.0, 4.0]) ≈ 5.0
+
+        # Single point
+        E1 = reshape([2.0, 2.0], 2, 1)
+        @test hypervolume(E1, [5.0, 5.0]) ≈ 9.0
+
+        # Dominated point should be filtered out: (1,1) dominates (2,2)
+        E2 = [1.0 2.0; 1.0 2.0]
+        @test hypervolume(E2, [3.0, 3.0]) ≈ 4.0
+
+        # All points outside reference
+        E3 = [5.0 6.0; 5.0 6.0]
+        @test hypervolume(E3, [4.0, 4.0]) ≈ 0.0
+
+        # Empty front
+        E4 = reshape(Float64[], 2, 0)
+        @test hypervolume(E4, [4.0, 4.0]) ≈ 0.0
+
+        # Three non-dominated points
+        E5 = [1.0 2.0 3.0; 4.0 2.0 1.0]
+        ref = [5.0, 5.0]
+        hv = hypervolume(E5, ref)
+        # (1,4): width=1, height=1 → 1
+        # (2,2): width=1, height=3 → 3
+        # (3,1): width=2, height=4 → 8 → total=12
+        @test hv ≈ 12.0
+    end
+
+    @testset "pareto_front" begin
+        # (1,2) and (2,1) are non-dominated; (3,3) is dominated by both
+        E = [1.0 2.0 3.0; 2.0 1.0 3.0]
+        P = [10.0 20.0 30.0; 10.0 20.0 30.0]
+        R = rank_function(E)
+        fe, fp = pareto_front(E, P, R)
+        @test size(fe, 2) == 2  # two non-dominated solutions
+        @test size(fp, 2) == 2
+        # check that all returned solutions have rank 0
+        fr = rank_function(fe)
+        @test all(fr .== 0)
+    end
+
+    @testset "convergence trace" begin
+        mod = Module(:BinhKornTrace)
+        Base.include(mod, "binh_korn_function.jl")
+
+        (EC, PC, RA, trace) = estimate_ensemble(
+            mod.objective_function, mod.neighbor_function,
+            mod.acceptance_probability_function, mod.cooling_function,
+            [2.5, 1.5];
+            rank_cutoff=4, maximum_number_of_iterations=10,
+            temperature_min=0.5, show_trace=false,
+            trace=true, trace_reference_point=[200.0, 50.0]
+        )
+
+        @test length(trace) > 0
+        @test haskey(first(trace), :temperature)
+        @test haskey(first(trace), :archive_size)
+        @test haskey(first(trace), :hypervolume)
+        @test all(t.hypervolume >= 0 for t in trace)
+        # temperatures should be decreasing
+        temps = [t.temperature for t in trace]
+        @test issorted(temps, rev=true)
+
+        # without trace, should return 3-tuple as before
+        result = estimate_ensemble(
+            mod.objective_function, mod.neighbor_function,
+            mod.acceptance_probability_function, mod.cooling_function,
+            [2.5, 1.5];
+            rank_cutoff=4, maximum_number_of_iterations=10,
+            temperature_min=0.5, show_trace=false
+        )
+        @test length(result) == 3
+    end
 end

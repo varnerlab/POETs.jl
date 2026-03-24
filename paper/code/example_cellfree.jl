@@ -1,5 +1,5 @@
-# Cell-free gene expression ensemble estimation
-# Simplified σ70 → P70 → deGFP circuit (C1) from Adhikari et al. (2020)
+# Cell-free gene expression ensemble estimation — REAL experimental data
+# P70-deGFP circuit from Adhikari et al. (2020), Frontiers in Bioengineering
 #
 # Two ODEs (mRNA, protein), two objectives (mRNA error, protein error).
 # Demonstrates how ParetoEnsembles.jl generates parameter ensembles
@@ -10,10 +10,30 @@
 
 using ParetoEnsembles
 using CairoMakie
+using CSV
+using DataFrames
 using Random
 using Statistics
 
 const FIGDIR = joinpath(@__DIR__, "..", "figures")
+
+# ──────────────────────────────────────────────────────────────
+# Load experimental data (Adhikari et al. 2020)
+# ──────────────────────────────────────────────────────────────
+data = CSV.read(joinpath(@__DIR__, "data", "P70_deGFP_data.csv"), DataFrame)
+const T_OBS = data.time_hr
+const m_data = data.mean_mRNA_nM
+const m_err = data.stdev_mRNA_nM
+const p_data_uM = data.mean_GFP_uM
+const p_err_uM = data.stdev_GFP_uM
+
+# Convert protein to nM for model consistency
+const p_data = p_data_uM .* 1000.0
+const p_err = p_err_uM .* 1000.0
+
+println("Experimental data loaded: $(length(T_OBS)) time points")
+println("  mRNA range: $(round(minimum(m_data), digits=1)) – $(round(maximum(m_data), digits=1)) nM")
+println("  Protein range: $(round(minimum(p_data_uM), digits=2)) – $(round(maximum(p_data_uM), digits=2)) μM")
 
 # ──────────────────────────────────────────────────────────────
 # Model: simplified cell-free TX/TL for deGFP
@@ -31,18 +51,10 @@ const N_HILL = 1.5     # Hill coefficient (fixed)
 const δp     = 0.005   # h⁻¹, protein degradation (very slow, fixed)
 
 # Parameter vector: [α, κ, δm, K, τ_half]
-#   α      : effective max transcription rate (nM/h)
-#   κ      : effective translation rate constant (h⁻¹)
-#   δm     : mRNA degradation rate (h⁻¹)
-#   K      : promoter dissociation constant (nM)
-#   τ_half : translation capacity half-life (h)
 const PARAM_NAMES = ["α", "κ", "δm", "K", "τ_half"]
-const P_LOWER = [500.0,  1.0,  0.5,  5.0,  1.0]
-const P_UPPER = [8000.0, 20.0, 10.0, 100.0, 10.0]
+const P_LOWER = [500.0,  0.5,  0.1,  1.0,  1.0]
+const P_UPPER = [10000.0, 30.0, 15.0, 150.0, 12.0]
 const N_PARAMS = 5
-
-# "True" parameters (calibrated to match Adhikari et al. Figure 2)
-const P_TRUE = [2800.0, 5.3, 3.0, 25.0, 4.0]
 
 # ──────────────────────────────────────────────────────────────
 # ODE right-hand side and simple RK4 integrator
@@ -75,7 +87,6 @@ function simulate(params; tspan=(0.0, 16.0), dt=0.005)
     return times, m, p
 end
 
-# Interpolate simulation at specific time points
 function sim_at_times(params, t_obs)
     times, m_sim, p_sim = simulate(params)
     m_out = zeros(length(t_obs))
@@ -89,47 +100,20 @@ function sim_at_times(params, t_obs)
 end
 
 # ──────────────────────────────────────────────────────────────
-# Generate synthetic experimental data
-# Mimic realistic cell-free measurements: samples taken at
-# discrete time points with ~10-15% coefficient of variation.
-# ──────────────────────────────────────────────────────────────
-const T_OBS = [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0]
-
-Random.seed!(2020)  # reproducible data
-m_true, p_true = sim_at_times(P_TRUE, T_OBS)
-
-# Add multiplicative Gaussian noise (CV ≈ 12%)
-const CV = 0.12
-m_data = m_true .* (1.0 .+ CV .* randn(length(T_OBS)))
-p_data = p_true .* (1.0 .+ CV .* randn(length(T_OBS)))
-m_data[1] = 0.0  # enforce zero IC
-p_data[1] = 0.0
-m_data .= max.(m_data, 0.0)
-p_data .= max.(p_data, 0.0)
-
-# Data error bars (standard error, 3 replicates)
-m_err = max.(m_data .* CV ./ sqrt(3), 5.0)   # floor at 5 nM
-p_err = max.(p_data .* CV ./ sqrt(3), 50.0)   # floor at 50 nM
-
-println("Synthetic data generated at $(length(T_OBS)) time points")
-println("  mRNA range: $(round(minimum(m_data), digits=1)) – $(round(maximum(m_data), digits=1)) nM")
-println("  Protein range: $(round(minimum(p_data), digits=1)) – $(round(maximum(p_data)/1000, digits=1)) μM")
-
-# ──────────────────────────────────────────────────────────────
 # ParetoEnsembles callbacks
 # ──────────────────────────────────────────────────────────────
-# Objective: 2 objectives — normalized SSE for mRNA, normalized SSE for protein
 function objective_function(x)
     f = zeros(2, 1)
     try
         m_sim, p_sim = sim_at_times(x, T_OBS)
-        # Normalized sum of squared errors
         for i in eachindex(T_OBS)
-            if m_data[i] > 0
-                f[1] += ((m_sim[i] - m_data[i]) / max(m_data[i], 1.0))^2
+            # stdev-weighted SSE for mRNA
+            if m_err[i] > 0
+                f[1] += ((m_sim[i] - m_data[i]) / m_err[i])^2
             end
-            if p_data[i] > 0
-                f[2] += ((p_sim[i] - p_data[i]) / max(p_data[i], 1.0))^2
+            # stdev-weighted SSE for protein
+            if p_err[i] > 0
+                f[2] += ((p_sim[i] - p_data[i]) / p_err[i])^2
             end
         end
     catch
@@ -139,7 +123,6 @@ function objective_function(x)
     return f
 end
 
-# Neighbor: multiplicative Gaussian perturbation with bounds
 function neighbor_function(x)
     new_x = x .* (1.0 .+ 0.08 .* randn(N_PARAMS))
     return clamp.(new_x, P_LOWER, P_UPPER)
@@ -171,6 +154,12 @@ println("  Total solutions: $n_total")
 println("  Pareto-optimal: $n_pareto")
 println("  Near-optimal: $(n_total - n_pareto)")
 
+# Compute hypervolume
+ref_point = [maximum(EC[1,:]) * 1.1, maximum(EC[2,:]) * 1.1]
+front_E, _ = pareto_front(EC, PC, RA)
+hv = hypervolume(front_E, ref_point)
+println("  Hypervolume (front): $(round(hv, digits=2))")
+
 # ──────────────────────────────────────────────────────────────
 # Select ensemble: rank ≤ 1 (Pareto front + first dominated layer)
 # ──────────────────────────────────────────────────────────────
@@ -181,8 +170,8 @@ println("  Ensemble size (rank ≤ 1): $n_ens")
 # Simulate all ensemble members on a fine time grid
 t_fine = collect(0.0:0.05:16.0)
 n_fine = length(t_fine)
-M_ens = zeros(n_ens, n_fine)  # mRNA trajectories
-P_ens = zeros(n_ens, n_fine)  # protein trajectories
+M_ens = zeros(n_ens, n_fine)
+P_ens = zeros(n_ens, n_fine)
 
 for (k, idx) in enumerate(ensemble_idx)
     params_k = PC[:, idx]
@@ -194,7 +183,6 @@ for (k, idx) in enumerate(ensemble_idx)
     end
 end
 
-# Compute statistics
 m_mean = vec(mean(M_ens, dims=1))
 m_lo   = vec(mapslices(x -> quantile(x, 0.025), M_ens, dims=1))
 m_hi   = vec(mapslices(x -> quantile(x, 0.975), M_ens, dims=1))
@@ -203,12 +191,8 @@ p_mean = vec(mean(P_ens, dims=1))
 p_lo   = vec(mapslices(x -> quantile(x, 0.025), P_ens, dims=1))
 p_hi   = vec(mapslices(x -> quantile(x, 0.975), P_ens, dims=1))
 
-
 # ──────────────────────────────────────────────────────────────
 # Figure: 3-panel cell-free ensemble results
-#   (a) mRNA ensemble vs data
-#   (b) protein ensemble vs data
-#   (c) Pareto front (ε_mRNA vs ε_protein)
 # ──────────────────────────────────────────────────────────────
 println("\nGenerating cell-free figure...")
 let
@@ -220,39 +204,34 @@ let
         ylabel = "mRNA deGFP (nM)",
         title = "(a)  mRNA")
 
-    # 95% CI band
     band!(ax_a, t_fine, m_lo, m_hi, color = (:dodgerblue, 0.2))
-    # ensemble mean
     lines!(ax_a, t_fine, m_mean, color = :dodgerblue, linewidth = 2, linestyle = :dash)
-    # data with error bars
     errorbars!(ax_a, T_OBS, m_data, m_err, color = :black, whiskerwidth = 5)
     scatter!(ax_a, T_OBS, m_data, color = :black, markersize = 7)
 
     # --- (b) protein ---
     ax_b = Axis(fig[1, 2],
         xlabel = "Time (h)",
-        ylabel = "Protein deGFP (μM)",
+        ylabel = "Protein deGFP (\u00b5M)",
         title = "(b)  Protein")
 
     band!(ax_b, t_fine, p_lo ./ 1000, p_hi ./ 1000, color = (:dodgerblue, 0.2))
     lines!(ax_b, t_fine, p_mean ./ 1000, color = :dodgerblue, linewidth = 2, linestyle = :dash)
-    errorbars!(ax_b, T_OBS, p_data ./ 1000, p_err ./ 1000, color = :black, whiskerwidth = 5)
-    scatter!(ax_b, T_OBS, p_data ./ 1000, color = :black, markersize = 7)
+    errorbars!(ax_b, T_OBS, p_data_uM, p_err_uM, color = :black, whiskerwidth = 5)
+    scatter!(ax_b, T_OBS, p_data_uM, color = :black, markersize = 7)
 
-    # --- (c) Pareto front (zoomed to region of interest) ---
-    # Use 95th percentile of rank ≤ 1 solutions to set axis limits
+    # --- (c) Pareto front ---
     ens_e1 = EC[1, ensemble_idx]
     ens_e2 = EC[2, ensemble_idx]
     xlim_hi = quantile(ens_e1, 0.95) * 1.3
     ylim_hi = quantile(ens_e2, 0.95) * 1.3
 
     ax_c = Axis(fig[1, 3],
-        xlabel = L"\varepsilon_{\mathrm{mRNA}}",
-        ylabel = L"\varepsilon_{\mathrm{protein}}",
+        xlabel = "\u03b5_mRNA",
+        ylabel = "\u03b5_protein",
         title = "(c)  Pareto front",
         limits = ((-xlim_hi * 0.05, xlim_hi), (-ylim_hi * 0.05, ylim_hi)))
 
-    # plot only solutions within the zoomed view
     p_idx = RA .== 0
     n_idx = .!p_idx
     scatter!(ax_c, EC[1, n_idx], EC[2, n_idx],
@@ -266,11 +245,10 @@ let
     elem_data = MarkerElement(color = :black, marker = :circle, markersize = 7)
     Legend(fig[2, 1:2],
         [elem_data, elem_mean, elem_band],
-        ["Synthetic data", "Ensemble mean", "95% CI"],
+        ["Experimental data", "Ensemble mean", "95% CI"],
         orientation = :horizontal, framevisible = false,
         tellwidth = false, tellheight = true)
 
-    # legend for Pareto front
     elem_pareto = MarkerElement(color = :black, marker = :circle, markersize = 5)
     elem_near = MarkerElement(color = (:gray65, 0.4), marker = :circle, markersize = 4)
     Legend(fig[2, 3],

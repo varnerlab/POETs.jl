@@ -49,9 +49,15 @@ acceptance probability. Solutions with rank below `rank_cutoff` are retained in 
 - `rng::AbstractRNG = Random.default_rng()`: random number generator for reproducibility.
 - `maximum_archive_size::Integer = 1000`: hard cap on archive size; if exceeded after pruning, only the best-ranked solutions are kept.
 - `parallel_evaluation::Bool = false`: use threaded Pareto ranking. Requires Julia started with multiple threads (`julia -t N`).
+- `trace::Bool = false`: when `true`, collect convergence diagnostics at each temperature step.
+- `trace_reference_point::Union{Nothing,AbstractVector} = nothing`: reference point for hypervolume computation in the trace. Required for 2-objective problems when `trace=true`.
 
 # Returns
-A tuple `(error_cache, parameter_cache, pareto_rank_array)` where:
+When `trace=false` (default), a tuple `(error_cache, parameter_cache, pareto_rank_array)`.
+When `trace=true`, a 4-tuple `(error_cache, parameter_cache, pareto_rank_array, trace_log)` where
+`trace_log` is a vector of named tuples with fields `temperature`, `archive_size`, and `hypervolume`.
+
+The first three elements are:
 - `error_cache::Matrix{Float64}`: objective values for retained solutions (`n_objectives × n_solutions`).
 - `parameter_cache::Matrix{Float64}`: parameter vectors for retained solutions (`n_params × n_solutions`).
 - `pareto_rank_array::Vector{Float64}`: Pareto rank of each retained solution (0 = Pareto optimal).
@@ -74,7 +80,8 @@ function estimate_ensemble(objective_function::Function, neighbor_function::Func
   initial_state::AbstractVector{<:Real}; maximum_number_of_iterations::Integer = 20,
   rank_cutoff::Real = 5.0, temperature_min::Real = 0.0001, show_trace::Bool = true,
   rng::AbstractRNG = Random.default_rng(), maximum_archive_size::Integer = 1000,
-  parallel_evaluation::Bool = false)
+  parallel_evaluation::Bool = false, trace::Bool = false,
+  trace_reference_point::Union{Nothing,AbstractVector} = nothing)
 
   # select serial or threaded ranking functions
   _rank_fn = parallel_evaluation ? _rank_columns_threaded : _rank_columns
@@ -88,6 +95,9 @@ function estimate_ensemble(objective_function::Function, neighbor_function::Func
   error_cols = Vector{Float64}[first_error]
   param_cols = Vector{Float64}[copy(parameter_array_best)]
   rank_array = zeros(1)  # initial solution has rank 0
+
+  # convergence trace storage
+  trace_log = NamedTuple{(:temperature,:archive_size,:hypervolume),Tuple{Float64,Int,Float64}}[]
 
   # main loop -
   while temperature > temperature_min
@@ -145,6 +155,18 @@ function estimate_ensemble(objective_function::Function, neighbor_function::Func
     # update the temperature -
     temperature = cooling_function(temperature)
 
+    # record trace if requested
+    if trace
+      n_arch = length(error_cols)
+      hv = if !isnothing(trace_reference_point) && length(error_cols[1]) == 2
+        ec_tmp = reduce(hcat, error_cols)
+        hypervolume(ec_tmp, trace_reference_point)
+      else
+        NaN
+      end
+      push!(trace_log, (temperature=temperature, archive_size=n_arch, hypervolume=hv))
+    end
+
   end
 
   # build output matrices -
@@ -152,7 +174,11 @@ function estimate_ensemble(objective_function::Function, neighbor_function::Func
   parameter_cache = reduce(hcat, param_cols)
   pareto_rank_array = rank_function(error_cache)
 
-  return (error_cache, parameter_cache, pareto_rank_array)
+  if trace
+    return (error_cache, parameter_cache, pareto_rank_array, trace_log)
+  else
+    return (error_cache, parameter_cache, pareto_rank_array)
+  end
 end
 
 # Internal: compute Pareto rank directly on column vectors (allocation-free inner loop)
@@ -344,6 +370,90 @@ function rank_function(error_cache)
   end
 
   return rank_array
+end
+
+"""
+    hypervolume(error_cache::AbstractMatrix, reference_point::AbstractVector) -> Float64
+
+Compute the hypervolume indicator for a 2D Pareto front.
+
+The hypervolume is the area of objective space that is dominated by the Pareto front and bounded
+above by the `reference_point`. Larger values indicate better front quality.
+
+# Arguments
+- `error_cache::AbstractMatrix`: `2 × n_solutions` matrix of objective values (lower is better).
+- `reference_point::AbstractVector`: `[ref1, ref2]` upper bound in each objective.
+
+# Returns
+- `Float64`: hypervolume indicator value.
+
+# Example
+```julia
+errors = [1.0 3.0; 3.0 1.0]
+hv = hypervolume(errors, [5.0, 5.0])
+```
+
+See also [`rank_function`](@ref), [`pareto_front`](@ref).
+"""
+function hypervolume(error_cache::AbstractMatrix, reference_point::AbstractVector)
+  @assert size(error_cache, 1) == 2 "hypervolume currently supports 2 objectives only"
+  @assert length(reference_point) == 2
+
+  n = size(error_cache, 2)
+  valid = Tuple{Float64,Float64}[]
+  for i in 1:n
+    if error_cache[1,i] < reference_point[1] && error_cache[2,i] < reference_point[2]
+      push!(valid, (error_cache[1,i], error_cache[2,i]))
+    end
+  end
+  isempty(valid) && return 0.0
+
+  sort!(valid, by=first)
+
+  # extract non-dominated subset (sweep from left, track min f2)
+  front = Tuple{Float64,Float64}[]
+  min_f2 = Inf
+  for pt in valid
+    if pt[2] < min_f2
+      push!(front, pt)
+      min_f2 = pt[2]
+    end
+  end
+
+  # compute area via sweep-line
+  hv = 0.0
+  for i in eachindex(front)
+    f1_right = (i < length(front)) ? front[i+1][1] : reference_point[1]
+    hv += (f1_right - front[i][1]) * (reference_point[2] - front[i][2])
+  end
+  return hv
+end
+
+"""
+    pareto_front(error_cache, parameter_cache, rank_array) -> (front_errors, front_params)
+
+Extract Pareto-optimal (rank = 0) solutions from the archive.
+
+# Arguments
+- `error_cache::AbstractMatrix`: `n_objectives × n_solutions` objective values.
+- `parameter_cache::AbstractMatrix`: `n_params × n_solutions` parameter vectors.
+- `rank_array::AbstractVector`: Pareto rank for each solution.
+
+# Returns
+A tuple `(front_errors, front_params)` containing only the rank-0 solutions.
+
+# Example
+```julia
+(EC, PC, RA) = estimate_ensemble(...)
+front_E, front_P = pareto_front(EC, PC, RA)
+```
+
+See also [`rank_function`](@ref), [`hypervolume`](@ref).
+"""
+function pareto_front(error_cache::AbstractMatrix, parameter_cache::AbstractMatrix,
+                      rank_array::AbstractVector)
+  idx = findall(rank_array .== 0)
+  return error_cache[:, idx], parameter_cache[:, idx]
 end
 
 """

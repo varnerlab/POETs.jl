@@ -55,8 +55,9 @@
 Mathematical models of biological and engineering systems often have many adjustable parameters that must be estimated from multiple, potentially conflicting datasets.
 Rather than reporting a single best-fit parameter vector, it is often more informative to generate an \emph{ensemble} of parameter sets that collectively map out the trade-offs among competing objectives.
 ParetoEnsembles.jl is an open-source Julia package that generates such ensembles using Pareto Optimal Ensemble Techniques (POETs), a simulated-annealing-based algorithm that requires no gradient information and is defined entirely by four user-supplied callback functions.
-This paper describes a substantially rewritten implementation that corrects the original dominance relation, reduces the per-iteration ranking cost through an incremental update scheme, and adds multi-chain parallel execution for improved front coverage and near-linear speedup with thread count.
-We demonstrate the package on two standard benchmark problems and on a cell-free gene expression model where the ensemble captures the trade-off between fitting messenger RNA and protein time-course data.
+This paper describes a substantially rewritten implementation that corrects the original dominance relation, reduces the per-iteration ranking cost through an incremental update scheme, and adds multi-chain parallel execution for improved front coverage.
+We demonstrate the package on two standard benchmark problems, a cell-free gene expression model fitted to experimental data, and a blood coagulation cascade model with ten estimated rate constants and three objectives.
+A head-to-head comparison with NSGA-II shows that ParetoEnsembles.jl produces denser fronts with comparable or superior hypervolume and inverted generational distance, and a sensitivity analysis confirms robustness to hyperparameter choices.
 ParetoEnsembles.jl is available under the MIT license at \url{https://github.com/varnerlab/ParetoEnsembles.jl}.
 \end{abstract}
 
@@ -80,7 +81,7 @@ Mature software implementations of these and related algorithms are available in
 In this study, we present ParetoEnsembles.jl, a substantially rewritten Julia~\citep{Bezanson2017} implementation of the POETs algorithm.
 The package takes a user-defined model and a set of objective functions --- each measuring how well a candidate parameter vector reproduces a particular dataset --- and returns a collection of parameter sets spanning the trade-off surface, along with their objective values and dominance ranks.
 Several algorithmic corrections and performance improvements have been made relative to the original implementation: the dominance check has been corrected from weak to strict Pareto dominance, the per-iteration ranking cost has been reduced from $O(n^{2}m)$ to $O(nm)$ through an incremental update scheme (where $n$ is the archive size and $m$ is the number of objectives), and multi-chain parallel execution has been added to improve front coverage.
-We describe the algorithm and its implementation (\cref{sec:algorithm,sec:software}), demonstrate the package on two standard benchmark problems and a cell-free gene expression model (\cref{sec:examples}), and discuss limitations and future directions (\cref{sec:discussion}).
+We describe the algorithm and its implementation (\cref{sec:algorithm,sec:software}), demonstrate the package on benchmark problems and two biological applications (\cref{sec:examples}), compare against NSGA-II and analyze hyperparameter sensitivity (\cref{sec:comparison}), and discuss limitations and future directions (\cref{sec:discussion}).
 
 % ============================================================
 \section{Algorithm}\label{sec:algorithm}
@@ -107,7 +108,6 @@ The pairwise test iterates over objectives and terminates early when any objecti
 \begin{algorithmic}[1]
 \Require Objective vectors $\mathbf{f}_j, \mathbf{f}_i \in \mathbb{R}^m$ (lower is better)
 \Ensure \textsc{true} if $\mathbf{f}_j \prec \mathbf{f}_i$, \textsc{false} otherwise
-\State $\textit{dominated} \gets \textsc{true}$
 \State $\textit{strictly\_better} \gets \textsc{false}$
 \For{$k = 1, \ldots, m$}
   \If{$f_{j,k} > f_{i,k}$}
@@ -118,7 +118,7 @@ The pairwise test iterates over objectives and terminates early when any objecti
     \Comment{$j$ is better in at least one objective}
   \EndIf
 \EndFor
-\State \Return $\textit{dominated} \;\wedge\; \textit{strictly\_better}$
+\State \Return $\textit{strictly\_better}$
 \end{algorithmic}
 \end{algorithm}
 
@@ -264,6 +264,8 @@ A standalone \texttt{rank\_function} computes Pareto ranks for an arbitrary $m \
 \texttt{estimate\_ensemble} & Run a single Pareto SA chain. Returns objective values, parameter vectors, and Pareto ranks for the retained archive. \\
 \texttt{estimate\_ensemble\_parallel} & Run $C$ independent chains in parallel (one per starting point), merge archives, and re-rank. \\
 \texttt{rank\_function} & Compute Pareto ranks for an $m \times n$ objective matrix. \\
+\texttt{hypervolume} & Compute the hypervolume indicator for a 2D Pareto front given a reference point. \\
+\texttt{pareto\_front} & Extract Pareto-optimal (rank $= 0$) solutions from the archive. \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -295,6 +297,8 @@ while \texttt{maximum\_number\_of\_iterations} (default~20) controls how many ca
 Annealing terminates when the temperature falls below \texttt{temperature\_min} (default $10^{-4}$).
 The \texttt{maximum\_archive\_size} parameter (default~1000) provides a hard upper bound on archive size as a safety net against pathological growth.
 Setting \texttt{parallel\_evaluation} to \texttt{true} activates threaded ranking, and an optional \texttt{rng} argument accepts any \texttt{AbstractRNG} for reproducibility.
+When \texttt{trace=true}, the algorithm records convergence diagnostics (temperature, archive size, and hypervolume) at each cooling step, returning a fourth element in the output tuple.
+Two additional utility functions are provided: \texttt{hypervolume} computes the hypervolume indicator for a 2D front using a sweep-line algorithm in $O(n \log n)$ time, and \texttt{pareto\_front} extracts the rank-zero subset from the archive.
 
 % ============================================================
 \section{Examples}\label{sec:examples}
@@ -410,15 +414,31 @@ where $u(\sigma_{70}) = \sigma_{70}^{n}/(K^n + \sigma_{70}^n)$ is a Hill-type pr
 Five parameters were treated as unknown: the maximum transcription rate $\alpha$, the effective translation rate constant $\kappa$, the mRNA degradation rate $\delta_m$, the promoter dissociation constant $K$, and the translation capacity half-life $\tau_{1/2}$.
 The remaining parameters ($\sigma_{70} = 35$~nM, $n = 1.5$, $\delta_p = 0.005$~h$^{-1}$) were fixed at values taken from the literature~\citep{Adhikari2020}.
 
-We generated synthetic experimental data by simulating the model with known ``true'' parameter values and adding multiplicative Gaussian noise (coefficient of variation $\approx 12\%$) at twelve time points spanning 0--16~h, mimicking the sampling protocol of typical cell-free protein synthesis experiments.
-Two objectives were defined: the normalized sum-of-squared error between simulated and observed mRNA concentrations ($\varepsilon_{\text{mRNA}}$), and the corresponding error for protein concentrations ($\varepsilon_{\text{protein}}$).
+We fitted the model to experimental data from~\citet{Adhikari2020}: mRNA and deGFP protein concentrations measured at five time points (0, 2, 4, 8, and 16~h) in triplicate, with reported means and standard deviations.
+Two objectives were defined as standard-deviation-weighted sums of squared errors: $\varepsilon_{\text{mRNA}} = \sum_i [(m_i^{\text{sim}} - m_i^{\text{obs}}) / \sigma_i^m]^2$ and $\varepsilon_{\text{protein}} = \sum_i [(p_i^{\text{sim}} - p_i^{\text{obs}}) / \sigma_i^p]^2$.
 We ran ten parallel chains with $R_{\text{cutoff}} = 8$ and $N_{\text{iter}} = 50$, starting from random initial parameter vectors drawn uniformly within the bounds.
 
-The resulting ensemble of 191 parameter sets (rank $\leq 1$) captured the dynamics of both mRNA and protein expression (\cref{fig:cellfree}a,b).
-The 95\% confidence interval of the ensemble simulations bracketed the synthetic data at nearly all time points, and the ensemble mean tracked the underlying trajectory.
+The resulting ensemble captured the dynamics of both mRNA and protein expression (\cref{fig:cellfree}a,b).
+The 95\% confidence interval of the ensemble simulations bracketed the experimental data at all time points, and the ensemble mean tracked the observed trajectories.
 The Pareto front revealed a clear trade-off between fitting the mRNA and protein time courses (\cref{fig:cellfree}c): parameter sets that minimized $\varepsilon_{\text{mRNA}}$ tended to have slightly larger $\varepsilon_{\text{protein}}$, and vice versa.
-This trade-off arises naturally because the mRNA degradation rate and translation capacity half-life have opposing effects on the two species, and the noise in each measurement channel pulls the optimal parameters in different directions.
-The ensemble provides decision makers with a family of plausible parameter sets rather than a single point estimate, enabling downstream uncertainty quantification of model predictions.
+This trade-off arises naturally because the mRNA degradation rate and translation capacity half-life have opposing effects on the two species.
+The ensemble provides a family of plausible parameter sets rather than a single point estimate, enabling downstream uncertainty quantification of model predictions.
+
+\subsection{Blood coagulation cascade}\label{sec:coag}
+To demonstrate the package on a larger-scale system, we considered the Hockin--Mann model of tissue-factor-initiated blood coagulation~\citep{HockinMann2002}.
+This mechanistic ODE model describes 34 chemical species interacting through 27 reactions governed by 42 rate constants, capturing the initiation, amplification, and inhibition phases of thrombin generation.
+All rate constants are available in the literature and were used as ground truth.
+
+We selected ten key catalytic and inhibition rate constants for estimation, spanning the extrinsic factor Xase ($k_{\text{cat}}$), intrinsic factor Xase ($k_{\text{cat}}$), prothrombinase ($k_{\text{cat}}$), and antithrombin~III inhibition pathways.
+Because these rate constants span six orders of magnitude (from $\sim$1 to $\sim 10^7$), we worked in log-space with bounds of $\pm 1.5$ orders of magnitude around the true values.
+Noisy ``experimental'' data were generated by simulating the model with the true rate constants at two tissue factor (TF) concentrations (5~pM and 25~pM) and adding 10\% multiplicative Gaussian noise to the total thrombin trajectory.
+Three objectives were defined: (1)~normalized SSE of the thrombin trajectory at 5~pM TF, (2)~normalized SSE at 25~pM TF, and (3)~a regularization term measuring the mean squared log-distance of estimated rate constants from their literature values.
+
+We ran eight parallel chains with $R_{\text{cutoff}} = 10$, $N_{\text{iter}} = 40$, and $\alpha = 0.92$.
+The ensemble of 140 parameter sets (rank $\leq 1$) produced thrombin trajectories that closely matched the noisy data at both TF concentrations (\cref{fig:coag}a,b).
+Parameter recovery was strong: median estimates for 8 of 10 rate constants fell within 10\% of the true values, with the prothrombinase $k_{\text{cat}}$ and antithrombin inhibition rates recovered to within 1--5\% (\cref{fig:coag}c).
+The hardest parameter to recover was the Factor~VIIIa activation rate ($k_{\text{IIa} \to \text{VIIIa}}$, 45\% error), reflecting its weaker influence on the thrombin trajectory relative to the dominant prothrombinase pathway.
+The three-dimensional Pareto front (\cref{fig:coag}d) revealed the expected trade-off between fitting the two TF conditions and staying close to the literature values.
 
 To quantify the benefit of multi-chain parallelism, we measured wall clock time for the cell-free ensemble estimation (ten chains, $N_{\text{iter}} = 50$) as a function of the number of Julia threads (\cref{tab:scaling}).
 Each configuration was run five times and the median time is reported.
@@ -442,21 +462,93 @@ The speedup is near-linear up to four threads ($3.1\times$) and reaches $4.1\tim
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_cellfree.pdf}
-\caption{Ensemble estimation for a cell-free gene expression circuit ($\sigma_{70} \to \text{P70} \to \text{deGFP}$).
-(a)~mRNA and (b)~protein concentration versus time; the blue dashed line is the ensemble mean, the shaded region is the 95\% confidence interval, and black points are synthetic data with error bars.
+\caption{Ensemble estimation for a cell-free gene expression circuit ($\sigma_{70} \to \text{P70} \to \text{deGFP}$) fitted to experimental data from~\citet{Adhikari2020}.
+(a)~mRNA and (b)~protein concentration versus time; the blue dashed line is the ensemble mean, the shaded region is the 95\% confidence interval, and black points are experimental data with error bars.
 (c)~Pareto front showing the trade-off between mRNA and protein fitting error.}\label{fig:cellfree}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_coagulation.pdf}
+\caption{Ensemble estimation for the Hockin--Mann blood coagulation model (34 species, 10 estimated rate constants, 3 objectives).
+(a,b)~Total thrombin concentration versus time at 5~pM and 25~pM tissue factor; the blue dashed line is the ensemble mean, the shaded region is the 95\% CI, and black points are noisy data.
+(c)~Parameter recovery: estimated versus true rate constants in log-space; the dashed red line is the identity and diamonds show the median ensemble estimate.
+(d)~Pareto front projection ($\varepsilon_1$ vs.\ $\varepsilon_2$), with rank-zero solutions in black.}\label{fig:coag}
+\end{figure}
+
+% ============================================================
+\section{Comparison and Sensitivity Analysis}\label{sec:comparison}
+
+\subsection{Comparison with NSGA-II}\label{sec:nsga}
+To position ParetoEnsembles.jl relative to population-based evolutionary methods, we compared it against NSGA-II~\citep{Deb2002} as implemented in Metaheuristics.jl~\citep{Mejia2022} on both benchmark problems.
+Function evaluation budgets were matched at approximately 110{,}000 evaluations per solver (ParetoEnsembles: 10 chains, $N_{\text{iter}} = 60$, $\alpha = 0.95$; NSGA-II: population 200, 550 generations).
+Five independent replicates were run for each solver, and the median hypervolume indicator (HV) and inverted generational distance (IGD) are reported (\cref{tab:comparison}).
+For the Fonseca--Fleming problem, IGD was computed against the analytical Pareto front; for Binh--Korn, a densely sampled reference front from a high-budget run was used.
+
+\begin{table}[ht]
+\centering
+\caption{Comparison of ParetoEnsembles.jl and NSGA-II on benchmark problems (median over 5 replicates; IQR in brackets). Higher HV and lower IGD are better. Both solvers used $\sim$110{,}000 function evaluations.}\label{tab:comparison}
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+\textbf{Problem} & \textbf{Solver} & \textbf{HV} & \textbf{IGD} & \textbf{Front size} & \textbf{Time (s)} \\
+\midrule
+Binh--Korn & ParetoEnsembles & \textbf{8035} & \textbf{0.014} & 6172 & 77 \\
+           & NSGA-II         & 8027          & 0.071          & 200  & 0.5 \\
+\midrule
+Fonseca--Fleming & ParetoEnsembles & \textbf{0.44} & \textbf{0.0004} & 2051 & 3.1 \\
+                 & NSGA-II         & 0.44          & 0.003           & 200  & 0.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+ParetoEnsembles.jl achieved comparable or slightly higher hypervolume than NSGA-II on both problems, and substantially lower IGD (5$\times$ on Binh--Korn, 7$\times$ on Fonseca--Fleming), indicating a closer approximation to the true Pareto front (\cref{fig:comparison}).
+The SA-based approach also produced much denser fronts (2{,}000--6{,}000 non-dominated solutions vs.\ 200 for NSGA-II), reflecting its design as an ensemble generator rather than a front approximator.
+NSGA-II was 50--150$\times$ faster in wall time, consistent with its population-parallel evaluation strategy.
+These results confirm that ParetoEnsembles.jl is competitive on front quality while offering the additional benefit of a dense near-optimal ensemble for downstream uncertainty analysis.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_comparison.pdf}
+\caption{Comparison of ParetoEnsembles.jl (left) and NSGA-II (right) on (a,b)~Binh--Korn and (c,d)~Fonseca--Fleming at matched evaluation budgets ($\sim$110{,}000).
+ParetoEnsembles.jl retains a cloud of near-optimal solutions (blue) in addition to the Pareto front (black), while NSGA-II returns only the non-dominated front.
+The dashed red curve in (c,d) is the theoretical Fonseca--Fleming front.}\label{fig:comparison}
+\end{figure}
+
+\subsection{Hyperparameter sensitivity}\label{sec:sensitivity}
+We assessed the sensitivity of ParetoEnsembles.jl to three key hyperparameters --- rank cutoff $R_{\text{cutoff}}$, cooling rate $\alpha$, and iterations per temperature $N_{\text{iter}}$ --- by sweeping each while holding the others at default values ($R_{\text{cutoff}} = 8$, $\alpha = 0.90$, $N_{\text{iter}} = 40$) on the Binh--Korn benchmark with five chains.
+For each configuration, five replicates were run and the hypervolume indicator was computed (\cref{fig:sensitivity}).
+
+The hypervolume was robust across all tested ranges.
+Rank cutoff values from 2 to 12 produced nearly identical HV, with a modest decline at $R_{\text{cutoff}} = 20$ where the archive retains many low-quality solutions.
+Faster cooling ($\alpha = 0.80$) performed comparably to slower cooling ($\alpha = 0.95$), with the latter showing slightly more variability.
+The algorithm was also insensitive to $N_{\text{iter}}$: even 10 iterations per temperature level produced competitive fronts, though 20 or more reduced inter-replicate variance.
+These results suggest that the default hyperparameters provide a reasonable starting point, and that users need not invest significant effort in tuning.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_sensitivity.pdf}
+\caption{Hyperparameter sensitivity on the Binh--Korn benchmark.
+Median hypervolume (line) with interquartile range (shaded band) over 5 replicates.
+(a)~Rank cutoff $R_{\text{cutoff}}$, (b)~cooling rate $\alpha$, (c)~iterations per temperature $N_{\text{iter}}$.
+Default values for the other two parameters are held constant in each sweep.}\label{fig:sensitivity}
 \end{figure}
 
 % ============================================================
 \section{Discussion}\label{sec:discussion}
-ParetoEnsembles.jl provides a lightweight, dependency-free Julia implementation of Pareto Optimal Ensemble Techniques for multiobjective optimization.
+ParetoEnsembles.jl provides a lightweight Julia implementation of Pareto Optimal Ensemble Techniques for multiobjective optimization.
 Relative to the original implementation~\citep{Song2010,Bassen2016}, the current version corrects the dominance relation from weak to strict,
-reduces the per-iteration ranking cost from $O(n^2 m)$ to $O(nm)$ through incremental updating, bounds archive growth through the pop-on-reject strategy and a hard size cap, and adds both threaded ranking and multi-chain parallel execution.
+reduces the per-iteration ranking cost from $O(n^2 m)$ to $O(nm)$ through incremental updating, bounds archive growth through the pop-on-reject strategy and a hard size cap, adds both threaded ranking and multi-chain parallel execution, and provides built-in hypervolume computation and convergence diagnostics.
 The callback-based design decouples the optimization algorithm from the problem definition, allowing users to apply ParetoEnsembles.jl to any domain where objective functions can be evaluated pointwise.
 
-Population-based evolutionary methods such as NSGA-II~\citep{Deb2002} and MOEA/D~\citep{Zhang2007}, available through mature frameworks like pymoo~\citep{Blank2020} and Metaheuristics.jl~\citep{Mejia2022}, are generally more sample-efficient than simulated annealing for smooth, well-conditioned objective landscapes, and should be preferred when the problem structure supports them.
-ParetoEnsembles.jl targets a complementary use case: problems where the user wants a simple, gradient-free ensemble generator with minimal configuration --- four callback functions and a handful of keyword arguments --- and where the primary goal is to characterize the cloud of near-optimal parameter sets rather than to find the tightest possible approximation of the Pareto front.
-The SA-based approach is particularly convenient for black-box objectives arising in systems biology, where function evaluations may be expensive, noisy, or non-differentiable, and where the simplicity of the interface lowers the barrier to generating parameter ensembles as part of a modeling workflow.
+The head-to-head comparison with NSGA-II (\cref{sec:nsga}) places ParetoEnsembles.jl in context.
+On both benchmarks, the SA-based approach achieved comparable hypervolume and substantially better IGD, producing fronts that are 10--30$\times$ denser than those returned by NSGA-II at matched evaluation budgets.
+NSGA-II is 50--150$\times$ faster in wall time, reflecting the inherently sequential nature of SA chains versus the population-parallel evaluation of evolutionary methods.
+ParetoEnsembles.jl targets a complementary use case: problems where the primary goal is to characterize the \emph{cloud} of near-optimal parameter sets --- not just the front itself --- and where the simplicity of the interface (four callback functions and a handful of keyword arguments) lowers the barrier to generating parameter ensembles as part of a modeling workflow.
+The coagulation cascade example (\cref{sec:coag}) demonstrates that this approach scales to systems with tens of species, ten or more estimated parameters, and three objectives, recovering most rate constants to within 10\% of their true values.
+
+The hyperparameter sensitivity analysis (\cref{sec:sensitivity}) shows that the algorithm is robust to the choice of rank cutoff, cooling rate, and iterations per temperature.
+This is a practical advantage: users can adopt the default settings without extensive tuning.
+The convergence trace feature (activated via \texttt{trace=true}) provides a built-in diagnostic for monitoring archive growth and hypervolume evolution over the annealing schedule, helping users assess whether the algorithm has run long enough.
 
 Several features are deliberately omitted from the current scope.
 The package does not implement gradient-based refinement, surrogate modeling, or adaptive cooling schedules, nor does it provide built-in visualization or benchmark problem libraries.
@@ -472,10 +564,10 @@ J.D.V. acknowledges support from the National Heart, Lung, and Blood Institute (
 ParetoEnsembles.jl is open source under the MIT license.
 The source code is available at \url{https://github.com/varnerlab/ParetoEnsembles.jl}.
 Documentation is hosted at \url{https://varnerlab.github.io/ParetoEnsembles.jl/dev/}.
-The package can be installed directly from the repository:
+The package is registered in the Julia General registry and can be installed via:
 \begin{lstlisting}[numbers=none,frame=none]
 using Pkg
-Pkg.add(url="https://github.com/varnerlab/ParetoEnsembles.jl")
+Pkg.add("ParetoEnsembles")
 \end{lstlisting}
 \noindent Example code reproducing all results in this paper is included in the \texttt{paper/code} directory of the repository.
 
