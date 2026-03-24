@@ -194,68 +194,59 @@ p_hi   = vec(mapslices(x -> quantile(x, 0.975), P_ens, dims=1))
 # ──────────────────────────────────────────────────────────────
 # Figure: 3-panel cell-free ensemble results
 # ──────────────────────────────────────────────────────────────
+include("paper_theme.jl")
+set_paper_theme!()
+
 println("\nGenerating cell-free figure...")
 let
-    fig = Figure(size = (1100, 380), fontsize = 13)
+    fig = Figure(size = (1100, 400))
 
     # --- (a) mRNA ---
     ax_a = Axis(fig[1, 1],
-        xlabel = "Time (h)",
-        ylabel = "mRNA deGFP (nM)",
+        xlabel = "Time (h)", ylabel = "mRNA deGFP (nM)",
         title = "(a)  mRNA")
 
-    band!(ax_a, t_fine, m_lo, m_hi, color = (:dodgerblue, 0.2))
-    lines!(ax_a, t_fine, m_mean, color = :dodgerblue, linewidth = 2, linestyle = :dash)
-    errorbars!(ax_a, T_OBS, m_data, m_err, color = :black, whiskerwidth = 5)
-    scatter!(ax_a, T_OBS, m_data, color = :black, markersize = 7)
+    band!(ax_a, t_fine, m_lo, m_hi, color = C_ENSEMBLE_FILL)
+    lines!(ax_a, t_fine, m_mean, color = C_MEAN, linewidth = 2, linestyle = :dash)
+    errorbars!(ax_a, T_OBS, m_data, m_err, color = C_DATA, whiskerwidth = 5)
+    scatter!(ax_a, T_OBS, m_data, color = C_DATA, markersize = 7)
 
     # --- (b) protein ---
     ax_b = Axis(fig[1, 2],
-        xlabel = "Time (h)",
-        ylabel = "Protein deGFP (\u00b5M)",
+        xlabel = "Time (h)", ylabel = "Protein deGFP (\u00b5M)",
         title = "(b)  Protein")
 
-    band!(ax_b, t_fine, p_lo ./ 1000, p_hi ./ 1000, color = (:dodgerblue, 0.2))
-    lines!(ax_b, t_fine, p_mean ./ 1000, color = :dodgerblue, linewidth = 2, linestyle = :dash)
-    errorbars!(ax_b, T_OBS, p_data_uM, p_err_uM, color = :black, whiskerwidth = 5)
-    scatter!(ax_b, T_OBS, p_data_uM, color = :black, markersize = 7)
+    band!(ax_b, t_fine, p_lo ./ 1000, p_hi ./ 1000, color = C_ENSEMBLE_FILL)
+    lines!(ax_b, t_fine, p_mean ./ 1000, color = C_MEAN, linewidth = 2, linestyle = :dash)
+    errorbars!(ax_b, T_OBS, p_data_uM, p_err_uM, color = C_DATA, whiskerwidth = 5)
+    scatter!(ax_b, T_OBS, p_data_uM, color = C_DATA, markersize = 7)
 
-    # --- (c) Pareto front ---
-    ens_e1 = EC[1, ensemble_idx]
-    ens_e2 = EC[2, ensemble_idx]
-    xlim_hi = quantile(ens_e1, 0.95) * 1.3
-    ylim_hi = quantile(ens_e2, 0.95) * 1.3
-
+    # --- (c) Pareto front (log scale to prevent smashing into origin) ---
     ax_c = Axis(fig[1, 3],
-        xlabel = "\u03b5_mRNA",
-        ylabel = "\u03b5_protein",
-        title = "(c)  Pareto front",
-        limits = ((-xlim_hi * 0.05, xlim_hi), (-ylim_hi * 0.05, ylim_hi)))
+        xlabel = "log\u2081\u2080(\u03b5 mRNA)", ylabel = "log\u2081\u2080(\u03b5 protein)",
+        title = "(c)  Pareto front")
+
+    # Log-transform objectives for visibility
+    log_e1 = log10.(EC[1, :] .+ 1e-10)
+    log_e2 = log10.(EC[2, :] .+ 1e-10)
 
     p_idx = RA .== 0
     n_idx = .!p_idx
-    scatter!(ax_c, EC[1, n_idx], EC[2, n_idx],
-        color = (:gray65, 0.4), markersize = 4)
-    scatter!(ax_c, EC[1, p_idx], EC[2, p_idx],
-        color = :black, markersize = 5)
+    scatter!(ax_c, log_e1[n_idx], log_e2[n_idx],
+        color = C_ENSEMBLE, markersize = 4)
+    scatter!(ax_c, log_e1[p_idx], log_e2[p_idx],
+        color = C_FRONT, markersize = 6)
 
-    # legend for time-series panels
-    elem_band = PolyElement(color = (:dodgerblue, 0.2))
-    elem_mean = LineElement(color = :dodgerblue, linewidth = 2, linestyle = :dash)
-    elem_data = MarkerElement(color = :black, marker = :circle, markersize = 7)
-    Legend(fig[2, 1:2],
-        [elem_data, elem_mean, elem_band],
-        ["Experimental data", "Ensemble mean", "95% CI"],
-        orientation = :horizontal, framevisible = false,
-        tellwidth = false, tellheight = true)
-
-    elem_pareto = MarkerElement(color = :black, marker = :circle, markersize = 5)
-    elem_near = MarkerElement(color = (:gray65, 0.4), marker = :circle, markersize = 4)
-    Legend(fig[2, 3],
-        [elem_pareto, elem_near],
-        ["Rank = 0", "Near-optimal"],
-        orientation = :horizontal, framevisible = false,
-        tellwidth = false, tellheight = true)
+    # legend
+    elem_band = PolyElement(color = C_ENSEMBLE_FILL)
+    elem_mean = LineElement(color = C_MEAN, linewidth = 2, linestyle = :dash)
+    elem_data = MarkerElement(color = C_DATA, marker = :circle, markersize = 7)
+    elem_pareto = MarkerElement(color = C_FRONT, marker = :circle, markersize = 6)
+    elem_near = MarkerElement(color = C_ENSEMBLE, marker = :circle, markersize = 4)
+    Legend(fig[2, 1:3],
+        [elem_data, elem_mean, elem_band, elem_pareto, elem_near],
+        ["Experimental data", "Ensemble mean", "95% CI", "Rank = 0", "Near-optimal"],
+        orientation = :horizontal, tellwidth = false, tellheight = true)
 
     save(joinpath(FIGDIR, "fig_cellfree.pdf"), fig)
     println("  Saved fig_cellfree.pdf")

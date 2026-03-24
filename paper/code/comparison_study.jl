@@ -221,62 +221,60 @@ for problem_name in ["Binh-Korn", "Fonseca-Fleming"]
 end
 
 # ──────────────────────────────────────────────────────────────
-# Figure: 2x2 comparison
+# Figure: 1x2 comparison — both solvers overlaid on same axes
 # ──────────────────────────────────────────────────────────────
+include("paper_theme.jl")
+set_paper_theme!()
+
 println("\nGenerating comparison figure...")
 let
-    fig = Figure(size = (900, 800), fontsize = 13)
-
-    # Use the last replicate for visualization
+    fig = Figure(size = (900, 420))
     bk = results["Binh-Korn"][end]
     ff = results["Fonseca-Fleming"][end]
 
-    # --- (a) BK: ParetoEnsembles ---
-    ax_a = Axis(fig[1, 1], xlabel = "f₁", ylabel = "f₂",
-        title = "(a)  Binh-Korn — ParetoEnsembles")
+    C_PE_PT = RGBAf(0.20, 0.45, 0.78, 0.35)
+    C_NSGA_PT = RGBAf(0.85, 0.35, 0.10, 0.60)
+
+    # --- (a) Binh-Korn: both solvers overlaid ---
+    ax_a = Axis(fig[1, 1], xlabel = "f\u2081", ylabel = "f\u2082",
+        title = "(a)  Binh-Korn")
+
+    # PE near-optimal cloud (light blue)
     p_idx = bk.RA_pe .== 0
     scatter!(ax_a, bk.EC_pe[1, .!p_idx], bk.EC_pe[2, .!p_idx],
-        color = (:steelblue, 0.3), markersize = 3)
+        color = C_PE_PT, markersize = 2)
+    # PE front (solid blue)
     scatter!(ax_a, bk.EC_pe[1, p_idx], bk.EC_pe[2, p_idx],
-        color = :black, markersize = 3)
+        color = C_PE, markersize = 3)
+    # NSGA-II front (orange)
+    scatter!(ax_a, bk.nsga_objs[1,:], bk.nsga_objs[2,:],
+        color = C_NSGA, markersize = 5, marker = :diamond)
 
-    # --- (b) BK: NSGA-II ---
-    ax_b = Axis(fig[1, 2], xlabel = "f₁", ylabel = "f₂",
-        title = "(b)  Binh-Korn — NSGA-II")
-    scatter!(ax_b, bk.nsga_objs[1,:], bk.nsga_objs[2,:],
-        color = :black, markersize = 3)
-    linkaxes!(ax_a, ax_b)
+    # --- (b) Fonseca-Fleming: both solvers overlaid ---
+    ax_b = Axis(fig[1, 2], xlabel = "f\u2081", ylabel = "f\u2082",
+        title = "(b)  Fonseca-Fleming")
 
-    # --- (c) FF: ParetoEnsembles ---
-    ax_c = Axis(fig[2, 1], xlabel = "f₁", ylabel = "f₂",
-        title = "(c)  Fonseca-Fleming — ParetoEnsembles")
-    p_idx_ff = ff.RA_pe .== 0
-    scatter!(ax_c, ff.EC_pe[1, .!p_idx_ff], ff.EC_pe[2, .!p_idx_ff],
-        color = (:steelblue, 0.3), markersize = 3)
-    scatter!(ax_c, ff.EC_pe[1, p_idx_ff], ff.EC_pe[2, p_idx_ff],
-        color = :black, markersize = 3)
     # Theoretical front
-    lines!(ax_c, ff_ref_front[1,:], ff_ref_front[2,:],
-        color = :red, linewidth = 1.5, linestyle = :dash)
+    lines!(ax_b, ff_ref_front[1,:], ff_ref_front[2,:],
+        color = (C_THEORY, 0.5), linewidth = 2, linestyle = :dash)
 
-    # --- (d) FF: NSGA-II ---
-    ax_d = Axis(fig[2, 2], xlabel = "f₁", ylabel = "f₂",
-        title = "(d)  Fonseca-Fleming — NSGA-II")
-    scatter!(ax_d, ff.nsga_objs[1,:], ff.nsga_objs[2,:],
-        color = :black, markersize = 3)
-    lines!(ax_d, ff_ref_front[1,:], ff_ref_front[2,:],
-        color = :red, linewidth = 1.5, linestyle = :dash)
-    linkaxes!(ax_c, ax_d)
+    p_idx_ff = ff.RA_pe .== 0
+    scatter!(ax_b, ff.EC_pe[1, .!p_idx_ff], ff.EC_pe[2, .!p_idx_ff],
+        color = C_PE_PT, markersize = 2)
+    scatter!(ax_b, ff.EC_pe[1, p_idx_ff], ff.EC_pe[2, p_idx_ff],
+        color = C_PE, markersize = 3)
+    scatter!(ax_b, ff.nsga_objs[1,:], ff.nsga_objs[2,:],
+        color = C_NSGA, markersize = 5, marker = :diamond)
 
-    # Legend
-    elem_front = MarkerElement(color = :black, marker = :circle, markersize = 4)
-    elem_near = MarkerElement(color = (:steelblue, 0.5), marker = :circle, markersize = 4)
-    elem_theo = LineElement(color = :red, linewidth = 1.5, linestyle = :dash)
-    Legend(fig[3, 1:2],
-        [elem_front, elem_near, elem_theo],
-        ["Pareto front", "Near-optimal (PE only)", "Theoretical front"],
-        orientation = :horizontal, framevisible = false,
-        tellwidth = false, tellheight = true)
+    # Shared legend
+    elem_pe_front = MarkerElement(color = C_PE, marker = :circle, markersize = 5)
+    elem_pe_near = MarkerElement(color = C_PE_PT, marker = :circle, markersize = 4)
+    elem_nsga = MarkerElement(color = C_NSGA, marker = :diamond, markersize = 6)
+    elem_theo = LineElement(color = (C_THEORY, 0.5), linewidth = 2, linestyle = :dash)
+    Legend(fig[2, 1:2],
+        [elem_pe_front, elem_pe_near, elem_nsga, elem_theo],
+        ["ParetoEnsembles (front)", "ParetoEnsembles (near-optimal)", "NSGA-II (front)", "Theoretical front"],
+        orientation = :horizontal, tellwidth = false, tellheight = true)
 
     save(joinpath(FIGDIR, "fig_comparison.pdf"), fig)
     println("  Saved fig_comparison.pdf")

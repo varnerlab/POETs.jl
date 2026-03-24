@@ -106,53 +106,69 @@ for ni in n_iters
 end
 
 # ──────────────────────────────────────────────────────────────
-# Figure: 3-panel sensitivity analysis
+# Figure: 3-panel sensitivity analysis (with swarm/strip + box)
 # ──────────────────────────────────────────────────────────────
+include("paper_theme.jl")
+set_paper_theme!()
+
+const C_SWEEP = RGBf(0.20, 0.45, 0.78)
+
 println("\nGenerating sensitivity figure...")
 let
-    fig = Figure(size = (1100, 350), fontsize = 13)
+    fig = Figure(size = (1100, 380))
 
     # --- (a) rank_cutoff ---
     ax_a = Axis(fig[1, 1],
-        xlabel = "Rank cutoff (R_cutoff)",
+        xlabel = "Rank cutoff (R\u209c\u1d64\u209c\u2092ff)",
         ylabel = "Hypervolume",
         title = "(a)  Rank cutoff",
-        xticks = rank_cutoffs)
+        xticks = (1:length(rank_cutoffs), string.(rank_cutoffs)))
 
-    medians_rc = [median(rc_hvs[rc]) for rc in rank_cutoffs]
-    lo_rc = [quantile(rc_hvs[rc], 0.25) for rc in rank_cutoffs]
-    hi_rc = [quantile(rc_hvs[rc], 0.75) for rc in rank_cutoffs]
-    band!(ax_a, rank_cutoffs, lo_rc, hi_rc, color = (:dodgerblue, 0.2))
-    lines!(ax_a, rank_cutoffs, medians_rc, color = :dodgerblue, linewidth = 2)
-    scatter!(ax_a, rank_cutoffs, medians_rc, color = :dodgerblue, markersize = 8)
+    for (i, rc) in enumerate(rank_cutoffs)
+        hvs = rc_hvs[rc]
+        # Individual points with jitter
+        jitter = 0.15 .* (rand(length(hvs)) .- 0.5)
+        scatter!(ax_a, fill(i, length(hvs)) .+ jitter, hvs,
+            color = (C_SWEEP, 0.5), markersize = 6)
+        # Median bar
+        med = median(hvs)
+        lines!(ax_a, [i - 0.25, i + 0.25], [med, med],
+            color = C_SWEEP, linewidth = 3)
+    end
 
     # --- (b) cooling rate ---
     ax_b = Axis(fig[1, 2],
-        xlabel = "Cooling rate (α)",
+        xlabel = "Cooling rate (\u03b1)",
         ylabel = "Hypervolume",
         title = "(b)  Cooling rate",
-        xticks = cooling_rates)
+        xticks = (1:length(cooling_rates), string.(cooling_rates)))
 
-    medians_alpha = [median(alpha_hvs[a]) for a in cooling_rates]
-    lo_alpha = [quantile(alpha_hvs[a], 0.25) for a in cooling_rates]
-    hi_alpha = [quantile(alpha_hvs[a], 0.75) for a in cooling_rates]
-    band!(ax_b, cooling_rates, lo_alpha, hi_alpha, color = (:dodgerblue, 0.2))
-    lines!(ax_b, cooling_rates, medians_alpha, color = :dodgerblue, linewidth = 2)
-    scatter!(ax_b, cooling_rates, medians_alpha, color = :dodgerblue, markersize = 8)
+    for (i, alpha) in enumerate(cooling_rates)
+        hvs = alpha_hvs[alpha]
+        jitter = 0.15 .* (rand(length(hvs)) .- 0.5)
+        scatter!(ax_b, fill(i, length(hvs)) .+ jitter, hvs,
+            color = (C_SWEEP, 0.5), markersize = 6)
+        med = median(hvs)
+        lines!(ax_b, [i - 0.25, i + 0.25], [med, med],
+            color = C_SWEEP, linewidth = 3)
+    end
 
     # --- (c) N_iter ---
     ax_c = Axis(fig[1, 3],
-        xlabel = "Iterations per temperature (N_iter)",
+        xlabel = "Iterations per temperature (N\u1d62\u209c\u2091\u1d63)",
         ylabel = "Hypervolume",
         title = "(c)  Iterations",
-        xticks = n_iters)
+        xticks = (1:length(n_iters), string.(n_iters)))
 
-    medians_ni = [median(niter_hvs[ni]) for ni in n_iters]
-    lo_ni = [quantile(niter_hvs[ni], 0.25) for ni in n_iters]
-    hi_ni = [quantile(niter_hvs[ni], 0.75) for ni in n_iters]
-    band!(ax_c, n_iters, lo_ni, hi_ni, color = (:dodgerblue, 0.2))
-    lines!(ax_c, n_iters, medians_ni, color = :dodgerblue, linewidth = 2)
-    scatter!(ax_c, n_iters, medians_ni, color = :dodgerblue, markersize = 8)
+    for (i, ni) in enumerate(n_iters)
+        hvs = niter_hvs[ni]
+        jitter = 0.15 .* (rand(length(hvs)) .- 0.5)
+        scatter!(ax_c, fill(i, length(hvs)) .+ jitter, hvs,
+            color = (C_SWEEP, 0.5), markersize = 6)
+        med = median(hvs)
+        lines!(ax_c, [i - 0.25, i + 0.25], [med, med],
+            color = C_SWEEP, linewidth = 3)
+    end
 
     save(joinpath(FIGDIR, "fig_sensitivity.pdf"), fig)
     println("  Saved fig_sensitivity.pdf")

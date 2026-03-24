@@ -127,9 +127,12 @@ println("  Retained: $(size(EC_bk1, 2)),  Pareto: $(count(RA_bk1 .== 0))")
 #   (a) BK objective space   (b) FF objective space
 #   (c) BK parameter space   (d) FF parameter space (x1 vs x2)
 # ──────────────────────────────────────────────────────────────
+include("paper_theme.jl")
+set_paper_theme!()
+
 println("Generating Figure 1 (combined 2×2 panel)...")
 let
-    fig = Figure(size = (900, 800), fontsize = 13)
+    fig = Figure(size = (900, 800))
 
     # Compute rank-based colors for each dataset
     colors_bk = rank_colors(RA_bk)
@@ -202,7 +205,7 @@ end
 # ──────────────────────────────────────────────────────────────
 println("Generating Figure 2 (single vs multi-chain)...")
 let
-    fig = Figure(size = (900, 400), fontsize = 13)
+    fig = Figure(size = (900, 400))
 
     colors_bk1 = rank_colors(RA_bk1)
     order_bk1 = sortperm(RA_bk1)

@@ -182,85 +182,75 @@ thr25_lo = vec(mapslices(x -> quantile(x, 0.025), Thr25_ens, dims=1)) .* 1e9
 thr25_hi = vec(mapslices(x -> quantile(x, 0.975), Thr25_ens, dims=1)) .* 1e9
 
 # ──────────────────────────────────────────────────────────────
-# Figure: 4-panel coagulation results
+# Figure: 4-panel coagulation results (with theme)
 # ──────────────────────────────────────────────────────────────
+include("paper_theme.jl")
+set_paper_theme!()
+
 println("\nGenerating coagulation figure...")
 let
-    fig = Figure(size = (1000, 800), fontsize = 13)
-
-    # --- (a) Thrombin at 5 pM TF ---
-    ax_a = Axis(fig[1, 1],
-        xlabel = "Time (s)",
-        ylabel = "Total thrombin (nM)",
-        title = "(a)  5 pM TF")
-
-    band!(ax_a, t_5pM, thr5_lo, thr5_hi, color = (:dodgerblue, 0.2))
-    lines!(ax_a, t_5pM, thr5_mean, color = :dodgerblue, linewidth = 2, linestyle = :dash)
-    # Plot data as sparse points (every 20th point to avoid clutter)
+    fig = Figure(size = (1000, 820))
     sparse = 1:20:length(t_5pM)
-    scatter!(ax_a, t_5pM[sparse], data_5pM[sparse] .* 1e9, color = :black, markersize = 4)
 
-    # --- (b) Thrombin at 25 pM TF ---
+    # --- (a) Thrombin at 5 pM TF (with 95% CI band) ---
+    ax_a = Axis(fig[1, 1],
+        xlabel = "Time (s)", ylabel = "Total thrombin (nM)",
+        title = "(a)  5 pM TF")
+    band!(ax_a, t_5pM, thr5_lo, thr5_hi, color = C_ENSEMBLE_FILL)
+    lines!(ax_a, t_5pM, thr5_mean, color = C_MEAN, linewidth = 2, linestyle = :dash)
+    scatter!(ax_a, t_5pM[sparse], data_5pM[sparse] .* 1e9, color = C_DATA, markersize = 4)
+
+    # --- (b) Thrombin at 25 pM TF (with 95% CI band) ---
     ax_b = Axis(fig[1, 2],
-        xlabel = "Time (s)",
-        ylabel = "Total thrombin (nM)",
+        xlabel = "Time (s)", ylabel = "Total thrombin (nM)",
         title = "(b)  25 pM TF")
-
-    band!(ax_b, t_25pM, thr25_lo, thr25_hi, color = (:dodgerblue, 0.2))
-    lines!(ax_b, t_25pM, thr25_mean, color = :dodgerblue, linewidth = 2, linestyle = :dash)
-    scatter!(ax_b, t_25pM[sparse], data_25pM[sparse] .* 1e9, color = :black, markersize = 4)
+    band!(ax_b, t_25pM, thr25_lo, thr25_hi, color = C_ENSEMBLE_FILL)
+    lines!(ax_b, t_25pM, thr25_mean, color = C_MEAN, linewidth = 2, linestyle = :dash)
+    scatter!(ax_b, t_25pM[sparse], data_25pM[sparse] .* 1e9, color = C_DATA, markersize = 4)
 
     # --- (c) Parameter recovery (log-log) ---
     ax_c = Axis(fig[2, 1],
-        xlabel = "True value (log10)",
-        ylabel = "Estimated value (log10)",
+        xlabel = "True value (log\u2081\u2080)", ylabel = "Estimated value (log\u2081\u2080)",
         title = "(c)  Parameter recovery")
-
-    # Plot all ensemble member estimates
     for k in 1:min(n_valid, 200)
         scatter!(ax_c, TRUE_LOG, PC[:, ens_idx_valid[k]],
-            color = (:dodgerblue, 0.15), markersize = 3)
+            color = (C_PE, 0.12), markersize = 3)
     end
-    # Identity line
     lims = (minimum(LOG_LOWER) - 0.5, maximum(LOG_UPPER) + 0.5)
     lines!(ax_c, [lims[1], lims[2]], [lims[1], lims[2]],
-        color = :red, linewidth = 1.5, linestyle = :dash)
-    # Median estimates
+        color = C_THEORY, linewidth = 1.5, linestyle = :dash)
     median_est = vec(median(PC[:, ens_idx_valid], dims=2))
-    scatter!(ax_c, TRUE_LOG, median_est, color = :black, markersize = 8, marker = :diamond)
+    scatter!(ax_c, TRUE_LOG, median_est, color = C_DATA, markersize = 8, marker = :diamond)
 
-    # --- (d) Pareto front projection (ε₁ vs ε₂, colored by ε₃) ---
+    # --- (d) Pareto front projection (log scale for visibility) ---
     ax_d = Axis(fig[2, 2],
-        xlabel = "\u03b5 (5 pM TF)",
-        ylabel = "\u03b5 (25 pM TF)",
+        xlabel = "log\u2081\u2080(\u03b5\u2081, 5 pM TF)",
+        ylabel = "log\u2081\u2080(\u03b5\u2082, 25 pM TF)",
         title = "(d)  Pareto front")
 
-    # Color by regularization objective (ε₃)
+    log_e1 = log10.(EC[1, :] .+ 1e-10)
+    log_e2 = log10.(EC[2, :] .+ 1e-10)
+    # Color by ε₃ (regularization)
     e3_vals = EC[3, :]
     e3_norm = clamp.((e3_vals .- minimum(e3_vals)) ./ (maximum(e3_vals) - minimum(e3_vals) + 1e-10), 0, 1)
-    colors = [RGBAf(0.1 + 0.5*t, 0.3 + 0.3*t, 0.85 - 0.3*t, 0.6) for t in e3_norm]
+    colors = [RGBAf(0.20 + 0.40*t, 0.45 + 0.25*t, 0.78 - 0.25*t, 0.55) for t in e3_norm]
 
-    # Plot near-optimal first, then front on top
     order = sortperm(RA, rev=true)
-    scatter!(ax_d, EC[1, order], EC[2, order],
-        color = colors[order], markersize = 4)
-
-    # Front points in black
+    scatter!(ax_d, log_e1[order], log_e2[order], color = colors[order], markersize = 4)
     p_idx = findall(RA .== 0)
-    scatter!(ax_d, EC[1, p_idx], EC[2, p_idx],
-        color = :black, markersize = 5)
+    scatter!(ax_d, log_e1[p_idx], log_e2[p_idx], color = C_FRONT, markersize = 6)
 
-    # Shared legend
-    elem_band = PolyElement(color = (:dodgerblue, 0.2))
-    elem_mean = LineElement(color = :dodgerblue, linewidth = 2, linestyle = :dash)
-    elem_data = MarkerElement(color = :black, marker = :circle, markersize = 4)
-    elem_identity = LineElement(color = :red, linewidth = 1.5, linestyle = :dash)
-    elem_median = MarkerElement(color = :black, marker = :diamond, markersize = 8)
+    # Legend
+    elem_band = PolyElement(color = C_ENSEMBLE_FILL)
+    elem_mean = LineElement(color = C_MEAN, linewidth = 2, linestyle = :dash)
+    elem_data = MarkerElement(color = C_DATA, marker = :circle, markersize = 4)
+    elem_identity = LineElement(color = C_THEORY, linewidth = 1.5, linestyle = :dash)
+    elem_median = MarkerElement(color = C_DATA, marker = :diamond, markersize = 8)
+    elem_front = MarkerElement(color = C_FRONT, marker = :circle, markersize = 6)
     Legend(fig[3, 1:2],
-        [elem_data, elem_mean, elem_band, elem_identity, elem_median],
-        ["Noisy data", "Ensemble mean", "95% CI", "Identity line", "Median estimate"],
-        orientation = :horizontal, framevisible = false,
-        tellwidth = false, tellheight = true)
+        [elem_data, elem_mean, elem_band, elem_identity, elem_median, elem_front],
+        ["Noisy data", "Ensemble mean", "95% CI", "Identity line", "Median estimate", "Rank = 0"],
+        orientation = :horizontal, tellwidth = false, tellheight = true)
 
     save(joinpath(FIGDIR, "fig_coagulation.pdf"), fig)
     println("  Saved fig_coagulation.pdf")
@@ -414,22 +404,21 @@ _, true_severe = simulate_patient(P_TRUE; TF_pM=5.0, VIII_pct=5.0)
 # ══════════════════════════════════════════════════════════════
 println("\nGenerating ensemble insights figure...")
 let
-    fig = Figure(size = (1100, 400), fontsize = 13)
+    fig = Figure(size = (1100, 420))
 
     # --- (a) Held-out prediction ---
     ax_a = Axis(fig[1, 1],
-        xlabel = "Time (s)",
-        ylabel = "Total thrombin (nM)",
+        xlabel = "Time (s)", ylabel = "Total thrombin (nM)",
         title = "(a)  Held-out prediction (1 pM TF)")
 
-    band!(ax_a, t_1pM, thr1_lo, thr1_hi, color = (:dodgerblue, 0.2))
-    lines!(ax_a, t_1pM, thr1_mean, color = :dodgerblue, linewidth = 2, linestyle = :dash,
+    band!(ax_a, t_1pM, thr1_lo, thr1_hi, color = C_ENSEMBLE_FILL)
+    lines!(ax_a, t_1pM, thr1_mean, color = C_MEAN, linewidth = 2, linestyle = :dash,
         label = "Ensemble mean")
-    lines!(ax_a, t_1pM, true_1pM .* 1e9, color = :black, linewidth = 2,
+    lines!(ax_a, t_1pM, true_1pM .* 1e9, color = C_TRUE, linewidth = 2,
         label = "True trajectory")
-    lines!(ax_a, t_1pM, best_1pM .* 1e9, color = :red, linewidth = 1.5, linestyle = :dot,
+    lines!(ax_a, t_1pM, best_1pM .* 1e9, color = C_THEORY, linewidth = 1.5, linestyle = :dot,
         label = "Best single fit")
-    axislegend(ax_a, position = :lt, framevisible = false, labelsize = 10)
+    axislegend(ax_a, position = :lt)
 
     # --- (b) Correlation heatmap ---
     ax_b = Axis(fig[1, 2],
@@ -437,7 +426,8 @@ let
         xticks = (1:N_EST, ["p$(ESTIMATE_INDICES[i])" for i in 1:N_EST]),
         yticks = (1:N_EST, ["p$(ESTIMATE_INDICES[i])" for i in 1:N_EST]),
         xticklabelrotation = π/4,
-        yreversed = true)
+        yreversed = true,
+        backgroundcolor = :white)
 
     hm = heatmap!(ax_b, 1:N_EST, 1:N_EST, cor_matrix,
         colormap = :RdBu, colorrange = (-1, 1))
@@ -445,8 +435,7 @@ let
 
     # --- (c) Patient predictions ---
     ax_c = Axis(fig[1, 3],
-        xlabel = "Time (s)",
-        ylabel = "Total thrombin (nM)",
+        xlabel = "Time (s)", ylabel = "Total thrombin (nM)",
         title = "(c)  Factor VIII deficiency")
 
     # Normal
@@ -454,31 +443,31 @@ let
     n_mean = vec(mean(Thr_normal[vn,:], dims=1)) .* 1e9
     n_lo = vec(mapslices(x -> quantile(x, 0.025), Thr_normal[vn,:], dims=1)) .* 1e9
     n_hi = vec(mapslices(x -> quantile(x, 0.975), Thr_normal[vn,:], dims=1)) .* 1e9
-    band!(ax_c, t_5pM, n_lo, n_hi, color = (:dodgerblue, 0.15))
-    lines!(ax_c, t_5pM, n_mean, color = :dodgerblue, linewidth = 2, label = "100% FVIII")
+    band!(ax_c, t_5pM, n_lo, n_hi, color = (C_NORMAL, 0.15))
+    lines!(ax_c, t_5pM, n_mean, color = C_NORMAL, linewidth = 2, label = "100% FVIII")
 
     # Mild hemophilia
     vm = .!any(isnan.(Thr_mild), dims=2)[:]
     m_mean = vec(mean(Thr_mild[vm,:], dims=1)) .* 1e9
     m_lo = vec(mapslices(x -> quantile(x, 0.025), Thr_mild[vm,:], dims=1)) .* 1e9
     m_hi = vec(mapslices(x -> quantile(x, 0.975), Thr_mild[vm,:], dims=1)) .* 1e9
-    band!(ax_c, t_5pM, m_lo, m_hi, color = (:orange, 0.15))
-    lines!(ax_c, t_5pM, m_mean, color = :orange, linewidth = 2, label = "30% FVIII")
+    band!(ax_c, t_5pM, m_lo, m_hi, color = (C_MILD, 0.15))
+    lines!(ax_c, t_5pM, m_mean, color = C_MILD, linewidth = 2, label = "30% FVIII")
 
     # Severe hemophilia
     vs = .!any(isnan.(Thr_severe), dims=2)[:]
     s_mean = vec(mean(Thr_severe[vs,:], dims=1)) .* 1e9
     s_lo = vec(mapslices(x -> quantile(x, 0.025), Thr_severe[vs,:], dims=1)) .* 1e9
     s_hi = vec(mapslices(x -> quantile(x, 0.975), Thr_severe[vs,:], dims=1)) .* 1e9
-    band!(ax_c, t_5pM, s_lo, s_hi, color = (:red, 0.15))
-    lines!(ax_c, t_5pM, s_mean, color = :red, linewidth = 2, label = "5% FVIII")
+    band!(ax_c, t_5pM, s_lo, s_hi, color = (C_SEVERE, 0.15))
+    lines!(ax_c, t_5pM, s_mean, color = C_SEVERE, linewidth = 2, label = "5% FVIII")
 
     # True trajectories as thin dashed lines
-    lines!(ax_c, t_5pM, true_normal .* 1e9, color = :black, linewidth = 1, linestyle = :dash)
-    lines!(ax_c, t_5pM, true_mild .* 1e9, color = :black, linewidth = 1, linestyle = :dash)
-    lines!(ax_c, t_5pM, true_severe .* 1e9, color = :black, linewidth = 1, linestyle = :dash)
+    lines!(ax_c, t_5pM, true_normal .* 1e9, color = C_TRUE, linewidth = 1, linestyle = :dash)
+    lines!(ax_c, t_5pM, true_mild .* 1e9, color = C_TRUE, linewidth = 1, linestyle = :dash)
+    lines!(ax_c, t_5pM, true_severe .* 1e9, color = C_TRUE, linewidth = 1, linestyle = :dash)
 
-    axislegend(ax_c, position = :rt, framevisible = false, labelsize = 10)
+    axislegend(ax_c, position = :rt)
 
     save(joinpath(FIGDIR, "fig_ensemble_insights.pdf"), fig)
     println("  Saved fig_ensemble_insights.pdf")
