@@ -168,6 +168,22 @@ We ran eight parallel chains with $R_{\text{cutoff}} = 10$, $N_{\text{iter}} = 4
 Parameter recovery was strong: median estimates for 8 of 10 rate constants fell within 10\% of the true values, with the prothrombinase $k_{\text{cat}}$ and antithrombin inhibition rates recovered to within 1--5\% (\cref{fig:coag}c), while the hardest parameter to recover was the Factor~VIIIa activation rate ($k_{\text{IIa} \to \text{VIIIa}}$, 45\% error), reflecting its weaker influence on the thrombin trajectory relative to the dominant prothrombinase pathway.
 The three-dimensional Pareto front (\cref{fig:coag}d) revealed the expected trade-off between fitting the two TF conditions and staying close to the literature values, demonstrating that ParetoEnsembles.jl scales effectively to systems with tens of species, ten or more estimated parameters, and three competing objectives.
 
+\subsection{Ensemble-based prediction and identifiability analysis}\label{sec:ensemble_insights}
+A key advantage of generating parameter ensembles rather than single point estimates is the ability to propagate uncertainty forward through the model to obtain calibrated prediction intervals.
+To demonstrate this, we used the coagulation ensemble --- which was trained only on thrombin trajectories at 5~pM and 25~pM TF --- to predict the thrombin time course at a held-out tissue factor concentration of 1~pM that was never used during optimization.
+The ensemble mean predicted a peak thrombin concentration of 497~nM, within 2\% of the true value of 508~nM, and the 95\% prediction interval from the ensemble bracketed the true trajectory along its entire time course (\cref{fig:insights}a).
+By contrast, the single best-fit parameter vector (lowest combined training error) produced a comparable point prediction but provided no uncertainty information whatsoever, illustrating why ensemble methods are essential when model predictions will inform downstream decisions.
+
+The ensemble also reveals the identifiability structure of the estimated parameters through their pairwise correlations (\cref{fig:insights}b).
+The strongest correlation was between the extrinsic factor Xase $k_{\text{cat}}$ and the prothrombinase $k_{\text{cat}}$ ($r = -0.80$), indicating that these two catalytic rates compensate each other: if the initiation-phase enzyme is faster, the amplification-phase enzyme must be correspondingly slower to produce the same thrombin trajectory.
+Other mechanistically interpretable correlations included the direct Xa-mediated thrombin generation rate versus Factor~Va activation ($r = -0.51$), reflecting the competition between direct and prothrombinase-mediated pathways, and the Factor~IXa activation rate versus the prothrombinase $k_{\text{cat}}$ ($r = -0.55$), reflecting the coupling between the intrinsic tenase and prothrombinase complexes in the amplification loop.
+These compensatory relationships, which are invisible to single-point estimation methods, provide mechanistic insight into which parameter combinations the data can and cannot constrain.
+
+Finally, we used the ensemble to simulate a clinically relevant perturbation: Factor~VIII deficiency (hemophilia~A) at varying severity levels.
+By reducing the initial Factor~VIII concentration to 30\% (mild hemophilia) and 5\% (severe hemophilia) of the nominal plasma level while keeping all estimated rate constants at their ensemble values, we obtained patient-specific predictions of thrombin generation that captured both the expected dose-dependent reduction in peak thrombin and the associated uncertainty (\cref{fig:insights}c).
+Peak thrombin decreased from $633 \pm 9$~nM in normal plasma to $517 \pm 8$~nM for mild hemophilia and $376 \pm 10$~nM for severe hemophilia, with the ensemble prediction intervals providing a quantitative measure of the confidence one should place in these predictions given the uncertainty in the underlying rate constants.
+Importantly, the true trajectories (computed from the known ground-truth parameters) fell within the ensemble prediction bands for all three conditions, confirming that the uncertainty estimates are well calibrated even for conditions that were not part of the original training data.
+
 \subsection{Comparison with NSGA-II}\label{sec:nsga}
 To position ParetoEnsembles.jl relative to population-based evolutionary methods, we compared it against NSGA-II~\citep{Deb2002} as implemented in Metaheuristics.jl~\citep{Mejia2022} on both benchmark problems, matching the function evaluation budget at approximately 110{,}000 evaluations per solver (ParetoEnsembles: 10 chains, $N_{\text{iter}} = 60$, $\alpha = 0.95$; NSGA-II: population 200, 550 generations).
 Five independent replicates were run for each solver, and the median hypervolume indicator (HV) and inverted generational distance (IGD) are reported in \cref{tab:comparison}, with IGD computed against the analytical Pareto front for the Fonseca--Fleming problem and against a densely sampled reference front from a high-budget run for Binh--Korn.
@@ -192,8 +208,10 @@ While NSGA-II is considerably faster in wall time --- reflecting the inherently 
 
 The biological applications presented here illustrate both the strengths and the current scope of the package.
 The cell-free gene expression example demonstrates that even a small model with five parameters and two objectives can reveal meaningful trade-offs when fitted to real experimental data, and the coagulation cascade example shows that the approach scales to systems with 34 species, ten estimated parameters spanning six orders of magnitude, and three competing objectives, recovering most rate constants to within 10\% of their true values.
-The hyperparameter sensitivity analysis further shows that the algorithm is robust to the choice of rank cutoff, cooling rate, and iterations per temperature, so that users can adopt the default settings without extensive tuning.
-The convergence trace feature, activated via the \texttt{trace} keyword argument, provides a built-in diagnostic for monitoring archive growth and hypervolume evolution over the annealing schedule, helping users assess whether the algorithm has run long enough for their particular problem.
+Crucially, the downstream analyses of the coagulation ensemble --- held-out prediction, parameter identifiability, and patient-specific simulation --- demonstrate that the value of an ensemble extends far beyond the optimization itself.
+The ensemble predicted thrombin generation at a held-out TF concentration to within 2\% of the true peak, with well-calibrated 95\% prediction intervals that no single point estimate can provide; the pairwise parameter correlations revealed mechanistically interpretable compensatory relationships between catalytic rate constants in the initiation and amplification phases of coagulation; and the hemophilia~A simulations showed that the ensemble can propagate parametric uncertainty through clinically relevant perturbations, yielding prediction intervals that widen appropriately as the system is driven further from the training conditions.
+These capabilities illustrate why ensemble methods are essential in applications where model predictions inform consequential decisions, and they provide a template for how ParetoEnsembles.jl can be used in practice.
+The hyperparameter sensitivity analysis further shows that the algorithm is robust to the choice of rank cutoff, cooling rate, and iterations per temperature, so that users can adopt the default settings without extensive tuning, and the convergence trace feature provides a built-in diagnostic for monitoring whether the annealing schedule was sufficient.
 
 Several features are deliberately omitted from the current scope.
 The package does not implement gradient-based refinement, surrogate modeling, or adaptive cooling schedules, nor does it provide built-in visualization or benchmark problem libraries.
@@ -410,6 +428,15 @@ The single chain yields a sparse archive of non-dominated solutions, while the m
 (a,b)~Total thrombin concentration versus time at 5~pM and 25~pM tissue factor; the blue dashed line is the ensemble mean, the shaded region is the 95\% CI, and black points are noisy data.
 (c)~Parameter recovery: estimated versus true rate constants in log-space; the dashed red line is the identity and diamonds show the median ensemble estimate.
 (d)~Pareto front projection ($\varepsilon_1$ vs.\ $\varepsilon_2$), with rank-zero solutions in black.}\label{fig:coag}
+\end{figure}
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_ensemble_insights.pdf}
+\caption{Downstream ensemble analysis for the coagulation model.
+(a)~Held-out prediction at 1~pM TF (not used during training): the ensemble mean (blue dashed) and 95\% CI (shaded) bracket the true trajectory (black), while the single best-fit (red dotted) provides no uncertainty information.
+(b)~Pairwise parameter correlation heatmap revealing compensatory relationships; strong negative correlations (e.g., extrinsic Xase $k_{\text{cat}}$ vs.\ prothrombinase $k_{\text{cat}}$, $r = -0.80$) indicate parameters that trade off against each other.
+(c)~Patient-specific predictions for Factor~VIII deficiency (hemophilia~A) at 100\%, 30\%, and 5\% of nominal FVIII levels; ensemble prediction bands capture the dose-dependent reduction in peak thrombin with calibrated uncertainty, and true trajectories (black dashed) fall within all three bands.}\label{fig:insights}
 \end{figure}
 
 \begin{figure}[p]

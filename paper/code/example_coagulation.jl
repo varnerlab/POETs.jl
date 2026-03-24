@@ -275,4 +275,213 @@ for i in 1:N_EST
             "est=$(round(10^median_est[i], sigdigits=3)), err=$(round(err_pct, digits=1))%")
 end
 
+# ══════════════════════════════════════════════════════════════
+# ANALYSIS 1: Held-out prediction at 1 pM TF
+# (trained on 5 pM and 25 pM only)
+# ══════════════════════════════════════════════════════════════
+println("\n=== Analysis 1: Held-out prediction at 1 pM TF ===")
+t_1pM, true_1pM = simulate_thrombin(P_TRUE; TF_pM=1.0)
+
+# Best single-fit: take the ensemble member with lowest total training error
+total_train_err = EC[1, ens_idx_valid] .+ EC[2, ens_idx_valid]
+best_idx = ens_idx_valid[argmin(total_train_err)]
+best_log = PC[:, best_idx]
+best_p = copy(P_TRUE)
+for (i, pidx) in enumerate(ESTIMATE_INDICES)
+    best_p[pidx] = 10.0^best_log[i]
+end
+_, best_1pM = simulate_thrombin(best_p; TF_pM=1.0)
+
+# Ensemble prediction
+Thr1_ens = zeros(n_valid, length(t_1pM))
+for (k, idx) in enumerate(ens_idx_valid)
+    x_log = PC[:, idx]
+    x = 10.0 .^ x_log
+    p_full = copy(P_TRUE)
+    for (i, pidx) in enumerate(ESTIMATE_INDICES)
+        p_full[pidx] = x[i]
+    end
+    try
+        _, thr1 = simulate_thrombin(p_full; TF_pM=1.0)
+        Thr1_ens[k, :] = thr1
+    catch
+        Thr1_ens[k, :] .= NaN
+    end
+end
+
+valid1 = .!any(isnan.(Thr1_ens), dims=2)[:]
+Thr1_valid = Thr1_ens[valid1, :]
+thr1_mean = vec(mean(Thr1_valid, dims=1)) .* 1e9
+thr1_lo = vec(mapslices(x -> quantile(x, 0.025), Thr1_valid, dims=1)) .* 1e9
+thr1_hi = vec(mapslices(x -> quantile(x, 0.975), Thr1_valid, dims=1)) .* 1e9
+println("  Ensemble members with valid 1 pM predictions: $(sum(valid1))")
+println("  True peak (1 pM): $(round(maximum(true_1pM)*1e9, digits=1)) nM")
+println("  Ensemble mean peak: $(round(maximum(thr1_mean), digits=1)) nM")
+println("  Best single-fit peak: $(round(maximum(best_1pM)*1e9, digits=1)) nM")
+
+# ══════════════════════════════════════════════════════════════
+# ANALYSIS 2: Parameter identifiability (pairwise correlations)
+# ══════════════════════════════════════════════════════════════
+println("\n=== Analysis 2: Parameter correlations ===")
+ens_params = PC[:, ens_idx_valid]  # N_EST x n_valid
+cor_matrix = zeros(N_EST, N_EST)
+for i in 1:N_EST, j in 1:N_EST
+    cor_matrix[i, j] = cor(ens_params[i, :], ens_params[j, :])
+end
+println("  Strongest correlations (|r| > 0.3):")
+for i in 1:N_EST, j in (i+1):N_EST
+    r = cor_matrix[i, j]
+    if abs(r) > 0.3
+        println("    $(ESTIMATE_NAMES[i]) vs $(ESTIMATE_NAMES[j]): r = $(round(r, digits=3))")
+    end
+end
+
+# ══════════════════════════════════════════════════════════════
+# ANALYSIS 3: Patient-specific — Factor VIII deficiency (hemophilia A)
+# ══════════════════════════════════════════════════════════════
+println("\n=== Analysis 3: Factor VIII deficiency (hemophilia A) ===")
+
+function simulate_patient(p_full; TF_pM, VIII_pct, saveat=10.0)
+    VIII_M = 7.0e-10 * VIII_pct / 100.0  # nominal = 7e-10 M
+    u0 = patient_initial_conditions(HockinMann2002;
+        TF=TF_pM*1e-12, VIII=VIII_M)
+    sol = simulate(HockinMann2002;
+        TF_concentration=TF_pM*1e-12,
+        tspan=(0.0, 1200.0), saveat=saveat,
+        p=p_full, u0=u0)
+    return sol.t, total_thrombin(HockinMann2002, sol)
+end
+
+# Normal plasma (100% FVIII) and severe hemophilia (5% FVIII)
+for (label, viii_pct) in [("Normal (100% FVIII)", 100.0), ("Mild hemophilia (30% FVIII)", 30.0), ("Severe hemophilia (5% FVIII)", 5.0)]
+    Thr_patient = zeros(n_valid, length(t_5pM))
+    n_ok = 0
+    for (k, idx) in enumerate(ens_idx_valid)
+        x_log = PC[:, idx]
+        x = 10.0 .^ x_log
+        p_full = copy(P_TRUE)
+        for (i, pidx) in enumerate(ESTIMATE_INDICES)
+            p_full[pidx] = x[i]
+        end
+        try
+            _, thr = simulate_patient(p_full; TF_pM=5.0, VIII_pct=viii_pct)
+            Thr_patient[k, :] = thr
+            n_ok += 1
+        catch
+            Thr_patient[k, :] .= NaN
+        end
+    end
+    valid_p = .!any(isnan.(Thr_patient), dims=2)[:]
+    peaks = maximum(Thr_patient[valid_p, :], dims=2) .* 1e9
+    println("  $label: peak = $(round(mean(peaks), digits=1)) ± $(round(std(peaks), digits=1)) nM (n=$(sum(valid_p)))")
+end
+
+# Full ensemble simulation for the figure
+Thr_normal = zeros(n_valid, length(t_5pM))
+Thr_mild = zeros(n_valid, length(t_5pM))
+Thr_severe = zeros(n_valid, length(t_5pM))
+for (k, idx) in enumerate(ens_idx_valid)
+    x_log = PC[:, idx]
+    x = 10.0 .^ x_log
+    p_full = copy(P_TRUE)
+    for (i, pidx) in enumerate(ESTIMATE_INDICES)
+        p_full[pidx] = x[i]
+    end
+    try
+        _, thr_n = simulate_patient(p_full; TF_pM=5.0, VIII_pct=100.0)
+        _, thr_m = simulate_patient(p_full; TF_pM=5.0, VIII_pct=30.0)
+        _, thr_s = simulate_patient(p_full; TF_pM=5.0, VIII_pct=5.0)
+        Thr_normal[k, :] = thr_n
+        Thr_mild[k, :] = thr_m
+        Thr_severe[k, :] = thr_s
+    catch
+        Thr_normal[k, :] .= NaN
+        Thr_mild[k, :] .= NaN
+        Thr_severe[k, :] .= NaN
+    end
+end
+
+# True trajectories for reference
+_, true_normal = simulate_patient(P_TRUE; TF_pM=5.0, VIII_pct=100.0)
+_, true_mild = simulate_patient(P_TRUE; TF_pM=5.0, VIII_pct=30.0)
+_, true_severe = simulate_patient(P_TRUE; TF_pM=5.0, VIII_pct=5.0)
+
+# ══════════════════════════════════════════════════════════════
+# Figure 2: Ensemble insights (3-panel)
+#   (a) Held-out prediction at 1 pM TF
+#   (b) Parameter correlation heatmap
+#   (c) Hemophilia A patient predictions
+# ══════════════════════════════════════════════════════════════
+println("\nGenerating ensemble insights figure...")
+let
+    fig = Figure(size = (1100, 400), fontsize = 13)
+
+    # --- (a) Held-out prediction ---
+    ax_a = Axis(fig[1, 1],
+        xlabel = "Time (s)",
+        ylabel = "Total thrombin (nM)",
+        title = "(a)  Held-out prediction (1 pM TF)")
+
+    band!(ax_a, t_1pM, thr1_lo, thr1_hi, color = (:dodgerblue, 0.2))
+    lines!(ax_a, t_1pM, thr1_mean, color = :dodgerblue, linewidth = 2, linestyle = :dash,
+        label = "Ensemble mean")
+    lines!(ax_a, t_1pM, true_1pM .* 1e9, color = :black, linewidth = 2,
+        label = "True trajectory")
+    lines!(ax_a, t_1pM, best_1pM .* 1e9, color = :red, linewidth = 1.5, linestyle = :dot,
+        label = "Best single fit")
+    axislegend(ax_a, position = :lt, framevisible = false, labelsize = 10)
+
+    # --- (b) Correlation heatmap ---
+    ax_b = Axis(fig[1, 2],
+        title = "(b)  Parameter correlations",
+        xticks = (1:N_EST, ["p$(ESTIMATE_INDICES[i])" for i in 1:N_EST]),
+        yticks = (1:N_EST, ["p$(ESTIMATE_INDICES[i])" for i in 1:N_EST]),
+        xticklabelrotation = π/4,
+        yreversed = true)
+
+    hm = heatmap!(ax_b, 1:N_EST, 1:N_EST, cor_matrix,
+        colormap = :RdBu, colorrange = (-1, 1))
+    Colorbar(fig[1, 2][1, 2], hm, label = "Correlation (r)")
+
+    # --- (c) Patient predictions ---
+    ax_c = Axis(fig[1, 3],
+        xlabel = "Time (s)",
+        ylabel = "Total thrombin (nM)",
+        title = "(c)  Factor VIII deficiency")
+
+    # Normal
+    vn = .!any(isnan.(Thr_normal), dims=2)[:]
+    n_mean = vec(mean(Thr_normal[vn,:], dims=1)) .* 1e9
+    n_lo = vec(mapslices(x -> quantile(x, 0.025), Thr_normal[vn,:], dims=1)) .* 1e9
+    n_hi = vec(mapslices(x -> quantile(x, 0.975), Thr_normal[vn,:], dims=1)) .* 1e9
+    band!(ax_c, t_5pM, n_lo, n_hi, color = (:dodgerblue, 0.15))
+    lines!(ax_c, t_5pM, n_mean, color = :dodgerblue, linewidth = 2, label = "100% FVIII")
+
+    # Mild hemophilia
+    vm = .!any(isnan.(Thr_mild), dims=2)[:]
+    m_mean = vec(mean(Thr_mild[vm,:], dims=1)) .* 1e9
+    m_lo = vec(mapslices(x -> quantile(x, 0.025), Thr_mild[vm,:], dims=1)) .* 1e9
+    m_hi = vec(mapslices(x -> quantile(x, 0.975), Thr_mild[vm,:], dims=1)) .* 1e9
+    band!(ax_c, t_5pM, m_lo, m_hi, color = (:orange, 0.15))
+    lines!(ax_c, t_5pM, m_mean, color = :orange, linewidth = 2, label = "30% FVIII")
+
+    # Severe hemophilia
+    vs = .!any(isnan.(Thr_severe), dims=2)[:]
+    s_mean = vec(mean(Thr_severe[vs,:], dims=1)) .* 1e9
+    s_lo = vec(mapslices(x -> quantile(x, 0.025), Thr_severe[vs,:], dims=1)) .* 1e9
+    s_hi = vec(mapslices(x -> quantile(x, 0.975), Thr_severe[vs,:], dims=1)) .* 1e9
+    band!(ax_c, t_5pM, s_lo, s_hi, color = (:red, 0.15))
+    lines!(ax_c, t_5pM, s_mean, color = :red, linewidth = 2, label = "5% FVIII")
+
+    # True trajectories as thin dashed lines
+    lines!(ax_c, t_5pM, true_normal .* 1e9, color = :black, linewidth = 1, linestyle = :dash)
+    lines!(ax_c, t_5pM, true_mild .* 1e9, color = :black, linewidth = 1, linestyle = :dash)
+    lines!(ax_c, t_5pM, true_severe .* 1e9, color = :black, linewidth = 1, linestyle = :dash)
+
+    axislegend(ax_c, position = :rt, framevisible = false, labelsize = 10)
+
+    save(joinpath(FIGDIR, "fig_ensemble_insights.pdf"), fig)
+    println("  Saved fig_ensemble_insights.pdf")
+end
+
 println("\nDone!")
