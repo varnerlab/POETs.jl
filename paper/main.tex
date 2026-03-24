@@ -248,10 +248,12 @@ Example code reproducing all results in this paper is included in the \texttt{pa
 \bibliography{references}
 
 % ============================================================
-% TABLES, FIGURES, AND ALGORITHMS (after references for journal submission)
+% ALGORITHMS, TABLES, AND FIGURES (after references for journal submission)
+% Each group separated by \clearpage to prevent interleaving.
 % ============================================================
-\clearpage
 
+% --- ALGORITHMS ---
+\clearpage
 \begin{algorithm}[p]
 \caption{\textsc{StrictlyDominates}$(\mathbf{f}_j, \mathbf{f}_i, m)$ --- Does solution $j$ strictly dominate solution $i$?}\label{alg:dominates}
 \begin{algorithmic}[1]
@@ -333,6 +335,8 @@ Example code reproducing all results in this paper is included in the \texttt{pa
 \end{algorithmic}
 \end{algorithm}
 
+% --- TABLES ---
+\clearpage
 \begin{table}[p]
 \centering
 \caption{Public API of ParetoEnsembles.jl.}\label{tab:api}
@@ -395,6 +399,8 @@ Fonseca--Fleming & ParetoEnsembles & \textbf{0.44} & \textbf{0.0004} & 2051 & 3.
 \end{tabular}
 \end{table}
 
+% --- FIGURES ---
+\clearpage
 \begin{figure}[p]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_benchmarks.pdf}
