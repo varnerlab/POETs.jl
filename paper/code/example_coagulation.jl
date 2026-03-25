@@ -1,8 +1,8 @@
 # Coagulation cascade ensemble estimation using HockinMann2002 model
 # 34 species, 42 rate constants (10 estimated), 3 objectives
 #
-# Demonstrates ParetoEnsembles.jl on a realistic-scale ODE model where
-# the true parameters are known, allowing assessment of parameter recovery.
+# Training: TGA curves at 5, 15, 25 pM TF (15% multiplicative noise)
+# Validation: TGA scalar features at 10, 20, 30 pM TF
 #
 # Run from the paper/code directory:
 #   julia --project -t4 example_coagulation.jl
@@ -47,7 +47,8 @@ println("Estimating $(N_EST) rate constants from HockinMann2002 model")
 println("True values (log10): ", round.(TRUE_LOG, digits=2))
 
 # ──────────────────────────────────────────────────────────────
-# Generate "experimental" data at two TF concentrations
+# Generate "experimental" data at three TF concentrations
+# Training: 5, 15, 25 pM TF with 15% multiplicative noise
 # ──────────────────────────────────────────────────────────────
 function simulate_thrombin(p_full; TF_pM, saveat=10.0)
     sol = simulate(HockinMann2002;
@@ -58,23 +59,27 @@ function simulate_thrombin(p_full; TF_pM, saveat=10.0)
     return sol.t, total_thrombin(HockinMann2002, sol)
 end
 
+const NOISE_CV = 0.15  # 15% multiplicative noise
+const TRAIN_TF = [5.0, 15.0, 25.0]
+
 Random.seed!(2024)
-t_5pM, true_5pM = simulate_thrombin(P_TRUE; TF_pM=5.0)
-t_25pM, true_25pM = simulate_thrombin(P_TRUE; TF_pM=25.0)
 
-# Add 10% multiplicative noise
-const NOISE_CV = 0.10
-data_5pM = true_5pM .* (1.0 .+ NOISE_CV .* randn(length(true_5pM)))
-data_5pM .= max.(data_5pM, 0.0)
-data_25pM = true_25pM .* (1.0 .+ NOISE_CV .* randn(length(true_25pM)))
-data_25pM .= max.(data_25pM, 0.0)
+# Generate true trajectories and noisy training data
+train_times = Vector{Vector{Float64}}(undef, 3)
+train_true  = Vector{Vector{Float64}}(undef, 3)
+train_data  = Vector{Vector{Float64}}(undef, 3)
 
-println("Data generated: $(length(t_5pM)) points at 5 pM TF, $(length(t_25pM)) points at 25 pM TF")
-println("  Peak thrombin (5 pM): $(round(maximum(true_5pM)*1e9, digits=1)) nM")
-println("  Peak thrombin (25 pM): $(round(maximum(true_25pM)*1e9, digits=1)) nM")
+for (i, tf) in enumerate(TRAIN_TF)
+    t, thr = simulate_thrombin(P_TRUE; TF_pM=tf)
+    train_times[i] = t
+    train_true[i]  = thr
+    noisy = thr .* (1.0 .+ NOISE_CV .* randn(length(thr)))
+    train_data[i]  = max.(noisy, 0.0)
+    println("Training data ($(tf) pM TF): $(length(t)) points, peak = $(round(maximum(thr)*1e9, digits=1)) nM")
+end
 
 # ──────────────────────────────────────────────────────────────
-# ParetoEnsembles callbacks — 3 objectives
+# ParetoEnsembles callbacks — 3 objectives (no regularization)
 # ──────────────────────────────────────────────────────────────
 function objective_function(x_log)
     f = zeros(3, 1)
@@ -87,18 +92,11 @@ function objective_function(x_log)
     end
 
     try
-        # Objective 1: normalized SSE at 5 pM TF
-        _, thrombin1 = simulate_thrombin(p_full; TF_pM=5.0)
-        norm1 = sum(data_5pM .^ 2) + 1e-30
-        f[1] = sum((thrombin1 .- data_5pM) .^ 2) / norm1
-
-        # Objective 2: normalized SSE at 25 pM TF
-        _, thrombin2 = simulate_thrombin(p_full; TF_pM=25.0)
-        norm2 = sum(data_25pM .^ 2) + 1e-30
-        f[2] = sum((thrombin2 .- data_25pM) .^ 2) / norm2
-
-        # Objective 3: regularization (log-distance from literature)
-        f[3] = sum((x_log .- TRUE_LOG) .^ 2) / N_EST
+        for (obj_i, tf) in enumerate(TRAIN_TF)
+            _, thrombin = simulate_thrombin(p_full; TF_pM=tf)
+            norm = sum(train_data[obj_i] .^ 2) + 1e-30
+            f[obj_i] = sum((thrombin .- train_data[obj_i]) .^ 2) / norm
+        end
     catch
         f .= 1e6
     end
@@ -136,87 +134,96 @@ println("  Total solutions: $n_total")
 println("  Pareto-optimal: $n_pareto")
 
 # ──────────────────────────────────────────────────────────────
-# Select ensemble (rank ≤ 1) and simulate
+# Select ensemble (rank ≤ 1) and simulate training conditions
 # ──────────────────────────────────────────────────────────────
 ensemble_idx = findall(RA .<= 1)
 n_ens = length(ensemble_idx)
 println("  Ensemble size (rank ≤ 1): $n_ens")
 
-# Simulate ensemble members
-Thr5_ens = zeros(n_ens, length(t_5pM))
-Thr25_ens = zeros(n_ens, length(t_25pM))
-
-for (k, idx) in enumerate(ensemble_idx)
-    x_log = PC[:, idx]
-    x = 10.0 .^ x_log
+# Helper: build full parameter vector from log-space estimates
+function build_params(x_log)
     p_full = copy(P_TRUE)
+    x = 10.0 .^ x_log
     for (i, pidx) in enumerate(ESTIMATE_INDICES)
         p_full[pidx] = x[i]
     end
-    try
-        _, thr5 = simulate_thrombin(p_full; TF_pM=5.0)
-        _, thr25 = simulate_thrombin(p_full; TF_pM=25.0)
-        Thr5_ens[k, :] = thr5
-        Thr25_ens[k, :] = thr25
-    catch
-        Thr5_ens[k, :] .= NaN
-        Thr25_ens[k, :] .= NaN
+    return p_full
+end
+
+# Simulate ensemble at training conditions
+n_t = length(train_times[1])
+Thr_train = [zeros(n_ens, n_t) for _ in 1:3]
+
+for (k, idx) in enumerate(ensemble_idx)
+    p_full = build_params(PC[:, idx])
+    for (i, tf) in enumerate(TRAIN_TF)
+        try
+            _, thr = simulate_thrombin(p_full; TF_pM=tf)
+            Thr_train[i][k, :] = thr
+        catch
+            Thr_train[i][k, :] .= NaN
+        end
     end
 end
 
-# Remove failed simulations
-valid = .!any(isnan.(Thr5_ens), dims=2)[:]
-Thr5_ens = Thr5_ens[valid, :]
-Thr25_ens = Thr25_ens[valid, :]
+# Remove failed simulations (any training condition failed)
+valid = .!any(hcat([any(isnan.(M), dims=2)[:] for M in Thr_train]...), dims=2)[:]
+for i in 1:3
+    Thr_train[i] = Thr_train[i][valid, :]
+end
 ens_idx_valid = ensemble_idx[valid]
 n_valid = sum(valid)
 println("  Valid ensemble members: $n_valid / $n_ens")
 
-# Statistics (convert to nM for plotting)
-thr5_mean = vec(mean(Thr5_ens, dims=1)) .* 1e9
-thr5_lo = vec(mapslices(x -> quantile(x, 0.025), Thr5_ens, dims=1)) .* 1e9
-thr5_hi = vec(mapslices(x -> quantile(x, 0.975), Thr5_ens, dims=1)) .* 1e9
+# Compute statistics (nM) for each training condition
+function ensemble_stats_nM(M)
+    μ  = vec(mean(M, dims=1)) .* 1e9
+    lo = vec(mapslices(x -> quantile(x, 0.025), M, dims=1)) .* 1e9
+    hi = vec(mapslices(x -> quantile(x, 0.975), M, dims=1)) .* 1e9
+    return μ, lo, hi
+end
 
-thr25_mean = vec(mean(Thr25_ens, dims=1)) .* 1e9
-thr25_lo = vec(mapslices(x -> quantile(x, 0.025), Thr25_ens, dims=1)) .* 1e9
-thr25_hi = vec(mapslices(x -> quantile(x, 0.975), Thr25_ens, dims=1)) .* 1e9
+train_stats = [ensemble_stats_nM(M) for M in Thr_train]
 
 # ──────────────────────────────────────────────────────────────
-# Figure: 4-panel coagulation results (with theme)
+# Figure: Coagulation training results (3-panel)
+#   (a) TGA fits at 5, 15, 25 pM TF
+#   (b) Parameter recovery
+#   (c) Pareto front
 # ──────────────────────────────────────────────────────────────
 include("paper_theme.jl")
 set_paper_theme!()
 
 println("\nGenerating coagulation figure...")
 
-# Visible CI band colors (distinct hues that pop against gray background)
-const C_CI_5pM  = RGBAf(0.90, 0.45, 0.10, 0.30)   # amber fill for 5 pM
-const C_CI_25pM = RGBAf(0.15, 0.65, 0.45, 0.30)    # teal fill for 25 pM
-const C_MEAN_5pM  = RGBf(0.85, 0.35, 0.05)          # dark amber for 5 pM mean
-const C_MEAN_25pM = RGBf(0.10, 0.50, 0.35)           # dark teal for 25 pM mean
-const C_DATA_5pM  = RGBf(0.70, 0.25, 0.00)           # brown for 5 pM data
-const C_DATA_25pM = RGBf(0.05, 0.40, 0.25)           # dark green for 25 pM data
+# Colors for three TF conditions
+const C_TF = [
+    (RGBAf(0.90, 0.45, 0.10, 0.25), RGBf(0.85, 0.35, 0.05), RGBf(0.70, 0.25, 0.00)),  # 5 pM: amber
+    (RGBAf(0.55, 0.25, 0.70, 0.25), RGBf(0.45, 0.20, 0.60), RGBf(0.35, 0.12, 0.50)),  # 15 pM: purple
+    (RGBAf(0.15, 0.65, 0.45, 0.25), RGBf(0.10, 0.50, 0.35), RGBf(0.05, 0.40, 0.25)),  # 25 pM: teal
+]
+const TF_LABELS = ["5 pM TF", "15 pM TF", "25 pM TF"]
 
 let
     fig = Figure(size = (1100, 820))
-    sparse = 1:20:length(t_5pM)
+    sparse = 1:20:n_t
 
-    # --- (a) Thrombin at 5 pM & 25 pM TF combined ---
+    # --- (a) Thrombin at 5, 15, 25 pM TF ---
     ax_a = Axis(fig[1, 1:2],
         xlabel = "Time (s)", ylabel = "Total thrombin (nM)",
-        title = "(a)  Ensemble estimation: 5 pM and 25 pM TF")
-    # 5 pM TF
-    band!(ax_a, t_5pM, thr5_lo, thr5_hi, color = C_CI_5pM)
-    lines!(ax_a, t_5pM, thr5_mean, color = C_MEAN_5pM, linewidth = 2, linestyle = :dash)
-    scatter!(ax_a, t_5pM[sparse], data_5pM[sparse] .* 1e9, color = C_DATA_5pM, markersize = 5)
-    # 25 pM TF
-    band!(ax_a, t_25pM, thr25_lo, thr25_hi, color = C_CI_25pM)
-    lines!(ax_a, t_25pM, thr25_mean, color = C_MEAN_25pM, linewidth = 2, linestyle = :dash)
-    scatter!(ax_a, t_25pM[sparse], data_25pM[sparse] .* 1e9, color = C_DATA_25pM, markersize = 5)
+        title = "(a)  Training data: TGA at 5, 15, and 25 pM TF")
+    for i in 1:3
+        c_fill, c_mean, c_data = C_TF[i]
+        μ, lo, hi = train_stats[i]
+        band!(ax_a, train_times[i], lo, hi, color = c_fill)
+        lines!(ax_a, train_times[i], μ, color = c_mean, linewidth = 2, linestyle = :dash)
+        scatter!(ax_a, train_times[i][sparse], train_data[i][sparse] .* 1e9,
+            color = c_data, markersize = 7)
+    end
 
     # --- (b) Parameter recovery (log-log) ---
     ax_b = Axis(fig[2, 1],
-        xlabel = "True value (log\u2081\u2080)", ylabel = "Estimated value (log\u2081\u2080)",
+        xlabel = "True value (log₁₀)", ylabel = "Estimated value (log₁₀)",
         title = "(b)  Parameter recovery")
     for k in 1:min(n_valid, 200)
         scatter!(ax_b, TRUE_LOG, PC[:, ens_idx_valid[k]],
@@ -228,15 +235,15 @@ let
     median_est = vec(median(PC[:, ens_idx_valid], dims=2))
     scatter!(ax_b, TRUE_LOG, median_est, color = C_DATA, markersize = 8, marker = :diamond)
 
-    # --- (c) Pareto front projection (log scale for visibility) ---
+    # --- (c) Pareto front projection (log scale) ---
     ax_c = Axis(fig[2, 2],
-        xlabel = "log\u2081\u2080(\u03b5\u2081, 5 pM TF)",
-        ylabel = "log\u2081\u2080(\u03b5\u2082, 25 pM TF)",
+        xlabel = "log₁₀(ε₁, 5 pM TF)",
+        ylabel = "log₁₀(ε₂, 15 pM TF)",
         title = "(c)  Pareto front")
 
     log_e1 = log10.(EC[1, :] .+ 1e-10)
     log_e2 = log10.(EC[2, :] .+ 1e-10)
-    # Color by ε₃ (regularization)
+    # Color by ε₃ (25 pM TF)
     e3_vals = EC[3, :]
     e3_norm = clamp.((e3_vals .- minimum(e3_vals)) ./ (maximum(e3_vals) - minimum(e3_vals) + 1e-10), 0, 1)
     colors = [RGBAf(0.20 + 0.40*t, 0.45 + 0.25*t, 0.78 - 0.25*t, 0.55) for t in e3_norm]
@@ -246,22 +253,27 @@ let
     p_idx = findall(RA .== 0)
     scatter!(ax_c, log_e1[p_idx], log_e2[p_idx], color = C_FRONT, markersize = 6)
 
-    # Legend
-    elem_data5 = MarkerElement(color = C_DATA_5pM, marker = :circle, markersize = 5)
-    elem_mean5 = LineElement(color = C_MEAN_5pM, linewidth = 2, linestyle = :dash)
-    elem_band5 = PolyElement(color = C_CI_5pM)
-    elem_data25 = MarkerElement(color = C_DATA_25pM, marker = :circle, markersize = 5)
-    elem_mean25 = LineElement(color = C_MEAN_25pM, linewidth = 2, linestyle = :dash)
-    elem_band25 = PolyElement(color = C_CI_25pM)
-    elem_identity = LineElement(color = C_THEORY, linewidth = 1.5, linestyle = :dash)
-    elem_median = MarkerElement(color = C_DATA, marker = :diamond, markersize = 8)
-    elem_front = MarkerElement(color = C_FRONT, marker = :circle, markersize = 6)
-    Legend(fig[3, 1:2],
-        [elem_data5, elem_mean5, elem_band5, elem_data25, elem_mean25, elem_band25,
-         elem_identity, elem_median, elem_front],
-        ["Data (5 pM)", "Mean (5 pM)", "95% CI (5 pM)", "Data (25 pM)", "Mean (25 pM)", "95% CI (25 pM)",
-         "Identity line", "Median estimate", "Rank = 0"],
-        orientation = :horizontal, tellwidth = false, tellheight = true, nbanks = 2)
+    # Compact legend: encoding + TF color key
+    legend_elems = [
+        # Encoding
+        MarkerElement(color = :gray40, marker = :circle, markersize = 7),
+        LineElement(color = :gray40, linewidth = 2, linestyle = :dash),
+        PolyElement(color = RGBAf(0.5, 0.5, 0.5, 0.25)),
+        LineElement(color = C_THEORY, linewidth = 1.5, linestyle = :dash),
+        MarkerElement(color = C_DATA, marker = :diamond, markersize = 8),
+        MarkerElement(color = C_FRONT, marker = :circle, markersize = 6),
+        # TF color swatches
+        PolyElement(color = C_TF[1][1], strokecolor = C_TF[1][2], strokewidth = 1),
+        PolyElement(color = C_TF[2][1], strokecolor = C_TF[2][2], strokewidth = 1),
+        PolyElement(color = C_TF[3][1], strokecolor = C_TF[3][2], strokewidth = 1),
+    ]
+    legend_labels = [
+        "Data", "Ensemble mean", "95% CI",
+        "Identity line", "Median estimate", "Pareto front",
+        TF_LABELS[1], TF_LABELS[2], TF_LABELS[3],
+    ]
+    Legend(fig[3, 1:2], legend_elems, legend_labels,
+        orientation = :horizontal, tellwidth = false, tellheight = true, nbanks = 1)
 
     save(joinpath(FIGDIR, "fig_coagulation.pdf"), fig)
     println("  Saved fig_coagulation.pdf")
@@ -277,53 +289,109 @@ for i in 1:N_EST
 end
 
 # ══════════════════════════════════════════════════════════════
-# ANALYSIS 1: Held-out prediction at 1 pM TF
-# (trained on 5 pM and 25 pM only)
+# VALIDATION: Thrombin profiles at held-out TF concentrations
+# Trained on TGA curves at 5, 15, 25 pM — validate on full
+# thrombin time courses at 10, 20, 30 pM TF
 # ══════════════════════════════════════════════════════════════
-println("\n=== Analysis 1: Held-out prediction at 1 pM TF ===")
-t_1pM, true_1pM = simulate_thrombin(P_TRUE; TF_pM=1.0)
+const VALID_TF = [10.0, 20.0, 30.0]
 
-# Best single-fit: take the ensemble member with lowest total training error
-total_train_err = EC[1, ens_idx_valid] .+ EC[2, ens_idx_valid]
-best_idx = ens_idx_valid[argmin(total_train_err)]
-best_log = PC[:, best_idx]
-best_p = copy(P_TRUE)
-for (i, pidx) in enumerate(ESTIMATE_INDICES)
-    best_p[pidx] = 10.0^best_log[i]
+println("\n=== Validation: Thrombin profiles at held-out TF concentrations ===")
+
+# True thrombin trajectories at validation conditions
+valid_times = Vector{Vector{Float64}}(undef, 3)
+valid_true  = Vector{Vector{Float64}}(undef, 3)
+for (i, tf) in enumerate(VALID_TF)
+    t, thr = simulate_thrombin(P_TRUE; TF_pM=tf)
+    valid_times[i] = t
+    valid_true[i]  = thr
+    println("  True peak at $(tf) pM TF: $(round(maximum(thr)*1e9, digits=1)) nM")
 end
-_, best_1pM = simulate_thrombin(best_p; TF_pM=1.0)
 
-# Ensemble prediction
-Thr1_ens = zeros(n_valid, length(t_1pM))
+# Ensemble thrombin trajectories at validation conditions
+Thr_valid = [zeros(n_valid, length(valid_times[1])) for _ in 1:3]
 for (k, idx) in enumerate(ens_idx_valid)
-    x_log = PC[:, idx]
-    x = 10.0 .^ x_log
-    p_full = copy(P_TRUE)
-    for (i, pidx) in enumerate(ESTIMATE_INDICES)
-        p_full[pidx] = x[i]
-    end
-    try
-        _, thr1 = simulate_thrombin(p_full; TF_pM=1.0)
-        Thr1_ens[k, :] = thr1
-    catch
-        Thr1_ens[k, :] .= NaN
+    p_full = build_params(PC[:, idx])
+    for (i, tf) in enumerate(VALID_TF)
+        try
+            _, thr = simulate_thrombin(p_full; TF_pM=tf)
+            Thr_valid[i][k, :] = thr
+        catch
+            Thr_valid[i][k, :] .= NaN
+        end
     end
 end
 
-valid1 = .!any(isnan.(Thr1_ens), dims=2)[:]
-Thr1_valid = Thr1_ens[valid1, :]
-thr1_mean = vec(mean(Thr1_valid, dims=1)) .* 1e9
-thr1_lo = vec(mapslices(x -> quantile(x, 0.025), Thr1_valid, dims=1)) .* 1e9
-thr1_hi = vec(mapslices(x -> quantile(x, 0.975), Thr1_valid, dims=1)) .* 1e9
-println("  Ensemble members with valid 1 pM predictions: $(sum(valid1))")
-println("  True peak (1 pM): $(round(maximum(true_1pM)*1e9, digits=1)) nM")
-println("  Ensemble mean peak: $(round(maximum(thr1_mean), digits=1)) nM")
-println("  Best single-fit peak: $(round(maximum(best_1pM)*1e9, digits=1)) nM")
+# Remove any failed simulations
+valid_mask = .!any(hcat([any(isnan.(M), dims=2)[:] for M in Thr_valid]...), dims=2)[:]
+for i in 1:3
+    Thr_valid[i] = Thr_valid[i][valid_mask, :]
+end
+n_valid_pred = sum(valid_mask)
+println("  Valid ensemble predictions: $n_valid_pred / $n_valid")
+
+valid_stats = [ensemble_stats_nM(M) for M in Thr_valid]
+
+# Print validation summary
+println("\nValidation summary (ensemble predictions vs truth):")
+for (i, tf) in enumerate(VALID_TF)
+    μ, lo, hi = valid_stats[i]
+    true_peak = maximum(valid_true[i]) * 1e9
+    ens_peak = maximum(μ)
+    err_pct = abs(ens_peak - true_peak) / true_peak * 100
+    # Check if true trajectory falls within 95% CI at all time points
+    true_nM = valid_true[i] .* 1e9
+    covered = all(lo .<= true_nM .<= hi)
+    println("  $(tf) pM TF: true peak=$(round(true_peak, digits=1)) nM, " *
+            "pred peak=$(round(ens_peak, digits=1)) nM, err=$(round(err_pct, digits=1))%, " *
+            "trajectory covered=$(covered)")
+end
+
+# Also compute TGA feature predictions for quantitative summary
+println("\nTGA feature predictions at held-out conditions:")
+feature_names = [:lagtime, :peak, :tpeak, :max_rate, :etp]
+feature_labels = ["Lag time (s)", "Peak (nM)", "Time to peak (s)", "Max rate (nM/s)", "ETP (nM·s)"]
+feature_scale = [1.0, 1e9, 1.0, 1e9, 1e9]
+
+for tf in VALID_TF
+    # True features
+    sol_true = simulate(HockinMann2002;
+        TF_concentration = tf * 1e-12,
+        tspan = (0.0, 1200.0), saveat = 1.0, p = P_TRUE)
+    feat_true = extract_tga_features(HockinMann2002, sol_true)
+
+    # Ensemble features
+    feat_vals = Dict(fn => Float64[] for fn in feature_names)
+    for idx in ens_idx_valid[valid_mask]
+        p_full = build_params(PC[:, idx])
+        try
+            sol = simulate(HockinMann2002;
+                TF_concentration = tf * 1e-12,
+                tspan = (0.0, 1200.0), saveat = 1.0, p = p_full)
+            feat = extract_tga_features(HockinMann2002, sol)
+            for fn in feature_names
+                push!(feat_vals[fn], getfield(feat, fn))
+            end
+        catch; end
+    end
+
+    println("  $(tf) pM TF:")
+    for (fn, fl, fs) in zip(feature_names, feature_labels, feature_scale)
+        vals = feat_vals[fn] .* fs
+        true_val = getfield(feat_true, fn) * fs
+        μ = mean(vals)
+        lo = quantile(vals, 0.025)
+        hi = quantile(vals, 0.975)
+        covered = lo <= true_val <= hi
+        println("    $fl: true=$(round(true_val, sigdigits=3)), " *
+                "pred=$(round(μ, sigdigits=3)) [$(round(lo, sigdigits=3)), $(round(hi, sigdigits=3))], " *
+                "covered=$covered")
+    end
+end
 
 # ══════════════════════════════════════════════════════════════
 # ANALYSIS 2: Parameter identifiability (pairwise correlations)
 # ══════════════════════════════════════════════════════════════
-println("\n=== Analysis 2: Parameter correlations ===")
+println("\n=== Analysis: Parameter correlations ===")
 ens_params = PC[:, ens_idx_valid]  # N_EST x n_valid
 cor_matrix = zeros(N_EST, N_EST)
 for i in 1:N_EST, j in 1:N_EST
@@ -340,7 +408,7 @@ end
 # ══════════════════════════════════════════════════════════════
 # ANALYSIS 3: Patient-specific — Factor VIII deficiency (hemophilia A)
 # ══════════════════════════════════════════════════════════════
-println("\n=== Analysis 3: Factor VIII deficiency (hemophilia A) ===")
+println("\n=== Analysis: Factor VIII deficiency (hemophilia A) ===")
 
 function simulate_patient(p_full; TF_pM, VIII_pct, saveat=10.0)
     VIII_M = 7.0e-10 * VIII_pct / 100.0  # nominal = 7e-10 M
@@ -353,86 +421,78 @@ function simulate_patient(p_full; TF_pM, VIII_pct, saveat=10.0)
     return sol.t, total_thrombin(HockinMann2002, sol)
 end
 
-# Normal plasma (100% FVIII) and severe hemophilia (5% FVIII)
-for (label, viii_pct) in [("Normal (100% FVIII)", 100.0), ("Mild hemophilia (30% FVIII)", 30.0), ("Severe hemophilia (5% FVIII)", 5.0)]
-    Thr_patient = zeros(n_valid, length(t_5pM))
-    n_ok = 0
-    for (k, idx) in enumerate(ens_idx_valid)
-        x_log = PC[:, idx]
-        x = 10.0 .^ x_log
-        p_full = copy(P_TRUE)
-        for (i, pidx) in enumerate(ESTIMATE_INDICES)
-            p_full[pidx] = x[i]
-        end
-        try
-            _, thr = simulate_patient(p_full; TF_pM=5.0, VIII_pct=viii_pct)
-            Thr_patient[k, :] = thr
-            n_ok += 1
-        catch
-            Thr_patient[k, :] .= NaN
-        end
-    end
-    valid_p = .!any(isnan.(Thr_patient), dims=2)[:]
-    peaks = maximum(Thr_patient[valid_p, :], dims=2) .* 1e9
-    println("  $label: peak = $(round(mean(peaks), digits=1)) ± $(round(std(peaks), digits=1)) nM (n=$(sum(valid_p)))")
-end
-
-# Full ensemble simulation for the figure
-Thr_normal = zeros(n_valid, length(t_5pM))
-Thr_mild = zeros(n_valid, length(t_5pM))
-Thr_severe = zeros(n_valid, length(t_5pM))
+# Simulate all hemophilia conditions
+Thr_normal = zeros(n_valid, n_t)
+Thr_mild   = zeros(n_valid, n_t)
+Thr_severe = zeros(n_valid, n_t)
 for (k, idx) in enumerate(ens_idx_valid)
-    x_log = PC[:, idx]
-    x = 10.0 .^ x_log
-    p_full = copy(P_TRUE)
-    for (i, pidx) in enumerate(ESTIMATE_INDICES)
-        p_full[pidx] = x[i]
-    end
+    p_full = build_params(PC[:, idx])
     try
         _, thr_n = simulate_patient(p_full; TF_pM=5.0, VIII_pct=100.0)
         _, thr_m = simulate_patient(p_full; TF_pM=5.0, VIII_pct=30.0)
         _, thr_s = simulate_patient(p_full; TF_pM=5.0, VIII_pct=5.0)
         Thr_normal[k, :] = thr_n
-        Thr_mild[k, :] = thr_m
+        Thr_mild[k, :]   = thr_m
         Thr_severe[k, :] = thr_s
     catch
         Thr_normal[k, :] .= NaN
-        Thr_mild[k, :] .= NaN
+        Thr_mild[k, :]   .= NaN
         Thr_severe[k, :] .= NaN
     end
 end
 
+# Print hemophilia summary
+for (label, viii_pct, M) in [("Normal (100%)", 100.0, Thr_normal),
+                              ("Mild (30%)", 30.0, Thr_mild),
+                              ("Severe (5%)", 5.0, Thr_severe)]
+    v = .!any(isnan.(M), dims=2)[:]
+    peaks = maximum(M[v, :], dims=2) .* 1e9
+    println("  $label: peak = $(round(mean(peaks), digits=1)) ± $(round(std(peaks), digits=1)) nM (n=$(sum(v)))")
+end
+
 # True trajectories for reference
 _, true_normal = simulate_patient(P_TRUE; TF_pM=5.0, VIII_pct=100.0)
-_, true_mild = simulate_patient(P_TRUE; TF_pM=5.0, VIII_pct=30.0)
+_, true_mild   = simulate_patient(P_TRUE; TF_pM=5.0, VIII_pct=30.0)
 _, true_severe = simulate_patient(P_TRUE; TF_pM=5.0, VIII_pct=5.0)
 
 # ══════════════════════════════════════════════════════════════
-# Figure 2: Ensemble insights (3-panel)
-#   (a) Held-out prediction at 1 pM TF
+# Figure 2: Ensemble insights (4-panel, 2×2)
+#   (a) Held-out thrombin profiles at 10, 20, 30 pM TF
 #   (b) Parameter correlation heatmap
 #   (c) Hemophilia A patient predictions
+#   (d) Parameter recovery with uncertainty
 # ══════════════════════════════════════════════════════════════
 println("\nGenerating ensemble insights figure...")
+
+# Colors for validation TF conditions (distinct from training colors)
+const C_VALID_TF = [
+    (RGBAf(0.20, 0.45, 0.78, 0.20), RGBf(0.20, 0.45, 0.78), RGBf(0.10, 0.30, 0.60)),  # 10 pM: blue
+    (RGBAf(0.75, 0.40, 0.55, 0.20), RGBf(0.65, 0.30, 0.45), RGBf(0.50, 0.20, 0.35)),  # 20 pM: rose
+    (RGBAf(0.50, 0.70, 0.20, 0.20), RGBf(0.40, 0.60, 0.15), RGBf(0.30, 0.45, 0.10)),  # 30 pM: olive
+]
+const VALID_LABELS = ["10 pM TF", "20 pM TF", "30 pM TF"]
+
 let
-    fig = Figure(size = (1100, 420))
+    fig = Figure(size = (1100, 820))
 
-    # --- (a) Held-out prediction ---
-    ax_a = Axis(fig[1, 1],
+    # --- (a) Held-out thrombin profiles ---
+    ax_a = Axis(fig[1, 1:2],
         xlabel = "Time (s)", ylabel = "Total thrombin (nM)",
-        title = "(a)  Held-out prediction (1 pM TF)")
+        title = "(a)  Held-out predictions (10, 20, 30 pM TF)")
 
-    band!(ax_a, t_1pM, thr1_lo, thr1_hi, color = C_ENSEMBLE_FILL)
-    lines!(ax_a, t_1pM, thr1_mean, color = C_MEAN, linewidth = 2, linestyle = :dash,
-        label = "Ensemble mean")
-    lines!(ax_a, t_1pM, true_1pM .* 1e9, color = C_TRUE, linewidth = 2,
-        label = "True trajectory")
-    lines!(ax_a, t_1pM, best_1pM .* 1e9, color = C_THEORY, linewidth = 1.5, linestyle = :dot,
-        label = "Best single fit")
-    axislegend(ax_a, position = :lt)
+    for i in 1:3
+        c_fill, c_mean, c_true = C_VALID_TF[i]
+        μ, lo, hi = valid_stats[i]
+        # Ensemble CI band and mean
+        band!(ax_a, valid_times[i], lo, hi, color = c_fill)
+        lines!(ax_a, valid_times[i], μ, color = c_mean, linewidth = 2, linestyle = :dash)
+        # True trajectory
+        lines!(ax_a, valid_times[i], valid_true[i] .* 1e9,
+            color = c_true, linewidth = 2)
+    end
 
-    # --- (b) Correlation heatmap ---
-    ax_b = Axis(fig[1, 2],
+    # --- (b) Parameter correlations ---
+    ax_b = Axis(fig[1, 3],
         title = "(b)  Parameter correlations",
         xticks = (1:N_EST, ["p$(ESTIMATE_INDICES[i])" for i in 1:N_EST]),
         yticks = (1:N_EST, ["p$(ESTIMATE_INDICES[i])" for i in 1:N_EST]),
@@ -442,43 +502,124 @@ let
 
     hm = heatmap!(ax_b, 1:N_EST, 1:N_EST, cor_matrix,
         colormap = :RdBu, colorrange = (-1, 1))
-    Colorbar(fig[1, 2][1, 2], hm, label = "Correlation (r)")
+    Colorbar(fig[1, 3][1, 2], hm, label = "r")
 
     # --- (c) Patient predictions ---
-    ax_c = Axis(fig[1, 3],
+    ax_c = Axis(fig[2, 1:2],
         xlabel = "Time (s)", ylabel = "Total thrombin (nM)",
-        title = "(c)  Factor VIII deficiency")
+        title = "(c)  Factor VIII deficiency (hemophilia A)")
 
-    # Normal
-    vn = .!any(isnan.(Thr_normal), dims=2)[:]
-    n_mean = vec(mean(Thr_normal[vn,:], dims=1)) .* 1e9
-    n_lo = vec(mapslices(x -> quantile(x, 0.025), Thr_normal[vn,:], dims=1)) .* 1e9
-    n_hi = vec(mapslices(x -> quantile(x, 0.975), Thr_normal[vn,:], dims=1)) .* 1e9
-    band!(ax_c, t_5pM, n_lo, n_hi, color = (C_NORMAL, 0.15))
-    lines!(ax_c, t_5pM, n_mean, color = C_NORMAL, linewidth = 2, label = "100% FVIII")
-
-    # Mild hemophilia
-    vm = .!any(isnan.(Thr_mild), dims=2)[:]
-    m_mean = vec(mean(Thr_mild[vm,:], dims=1)) .* 1e9
-    m_lo = vec(mapslices(x -> quantile(x, 0.025), Thr_mild[vm,:], dims=1)) .* 1e9
-    m_hi = vec(mapslices(x -> quantile(x, 0.975), Thr_mild[vm,:], dims=1)) .* 1e9
-    band!(ax_c, t_5pM, m_lo, m_hi, color = (C_MILD, 0.15))
-    lines!(ax_c, t_5pM, m_mean, color = C_MILD, linewidth = 2, label = "30% FVIII")
-
-    # Severe hemophilia
-    vs = .!any(isnan.(Thr_severe), dims=2)[:]
-    s_mean = vec(mean(Thr_severe[vs,:], dims=1)) .* 1e9
-    s_lo = vec(mapslices(x -> quantile(x, 0.025), Thr_severe[vs,:], dims=1)) .* 1e9
-    s_hi = vec(mapslices(x -> quantile(x, 0.975), Thr_severe[vs,:], dims=1)) .* 1e9
-    band!(ax_c, t_5pM, s_lo, s_hi, color = (C_SEVERE, 0.15))
-    lines!(ax_c, t_5pM, s_mean, color = C_SEVERE, linewidth = 2, label = "5% FVIII")
-
-    # True trajectories as thin dashed lines
-    lines!(ax_c, t_5pM, true_normal .* 1e9, color = C_TRUE, linewidth = 1, linestyle = :dash)
-    lines!(ax_c, t_5pM, true_mild .* 1e9, color = C_TRUE, linewidth = 1, linestyle = :dash)
-    lines!(ax_c, t_5pM, true_severe .* 1e9, color = C_TRUE, linewidth = 1, linestyle = :dash)
-
+    for (label, M, true_traj, col) in [
+            ("100% FVIII", Thr_normal, true_normal, C_NORMAL),
+            ("30% FVIII",  Thr_mild,   true_mild,   C_MILD),
+            ("5% FVIII",   Thr_severe, true_severe,  C_SEVERE)]
+        v = .!any(isnan.(M), dims=2)[:]
+        μ, lo, hi = ensemble_stats_nM(M[v, :])
+        band!(ax_c, train_times[1], lo, hi, color = (col, 0.15))
+        lines!(ax_c, train_times[1], μ, color = col, linewidth = 2, label = label)
+        lines!(ax_c, train_times[1], true_traj .* 1e9,
+            color = C_TRUE, linewidth = 1, linestyle = :dash)
+    end
+    # Add true trajectory to legend
+    lines!(ax_c, [NaN], [NaN], color = C_TRUE, linewidth = 1, linestyle = :dash, label = "True")
     axislegend(ax_c, position = :rt)
+
+    # --- (d) TGA feature predictions at held-out conditions ---
+    # Dot-and-whisker: ensemble mean ± 95% CI normalized to true value
+    ax_d = Axis(fig[2, 3],
+        ylabel = "Predicted / True",
+        title = "(d)  TGA feature accuracy")
+
+    display_features = [:lagtime, :peak, :etp]
+    display_labels = ["Lag time", "Peak IIa", "ETP"]
+    display_scale = [1.0, 1e9, 1e9]
+
+    x_pos = 0
+    xtick_pos = Float64[]
+    xtick_labels_d = String[]
+
+    for (fi, (fn, fl, fs)) in enumerate(zip(display_features, display_labels, display_scale))
+        for (ti, tf) in enumerate(VALID_TF)
+            x_pos += 1
+
+            # Recompute features for this condition
+            sol_true = simulate(HockinMann2002;
+                TF_concentration = tf * 1e-12,
+                tspan = (0.0, 1200.0), saveat = 1.0, p = P_TRUE)
+            feat_true = extract_tga_features(HockinMann2002, sol_true)
+            true_val = getfield(feat_true, fn) * fs
+
+            vals = Float64[]
+            for idx in ens_idx_valid[valid_mask]
+                p_full = build_params(PC[:, idx])
+                try
+                    sol = simulate(HockinMann2002;
+                        TF_concentration = tf * 1e-12,
+                        tspan = (0.0, 1200.0), saveat = 1.0, p = p_full)
+                    feat = extract_tga_features(HockinMann2002, sol)
+                    push!(vals, getfield(feat, fn) * fs)
+                catch; end
+            end
+
+            vals_norm = vals ./ true_val
+            μ = mean(vals_norm)
+            lo = quantile(vals_norm, 0.025)
+            hi = quantile(vals_norm, 0.975)
+            covered = lo <= 1.0 <= hi
+
+            # CI whisker
+            c_fill, c_mean, _ = C_VALID_TF[ti]
+            lines!(ax_d, [x_pos, x_pos], [lo, hi],
+                color = c_mean, linewidth = 3)
+            # Mean dot
+            scatter!(ax_d, [x_pos], [μ],
+                color = c_mean, markersize = 10)
+            # True value marker
+            mkr_color = covered ? :black : C_THEORY
+            scatter!(ax_d, [x_pos], [1.0],
+                color = mkr_color, markersize = 8, marker = :xcross)
+
+            push!(xtick_pos, x_pos)
+            push!(xtick_labels_d, "$(Int(tf))")
+        end
+        x_pos += 0.5  # gap between feature groups
+    end
+
+    hlines!(ax_d, [1.0], color = :gray50, linewidth = 0.8, linestyle = :dash)
+    ax_d.xticks = (xtick_pos, xtick_labels_d)
+
+    # Vertical separators between feature groups
+    for sep in [3.75, 7.25]
+        vlines!(ax_d, [sep], color = :gray70, linewidth = 0.6, linestyle = :dot)
+    end
+
+    # Feature group labels at top
+    for (fi, fl) in enumerate(display_labels)
+        mid_x = mean(xtick_pos[(fi-1)*3+1 : fi*3])
+        text!(ax_d, mid_x, 1.0; text = fl,
+            align = (:center, :bottom), fontsize = 11,
+            offset = (0, 55))
+    end
+
+    # Compact legend: encoding + TF color key for panel (a)
+    legend_elems = [
+        LineElement(color = :gray40, linewidth = 2),
+        LineElement(color = :gray40, linewidth = 2, linestyle = :dash),
+        PolyElement(color = RGBAf(0.5, 0.5, 0.5, 0.20)),
+        MarkerElement(color = :black, marker = :xcross, markersize = 8),
+        MarkerElement(color = C_THEORY, marker = :xcross, markersize = 8),
+        # TF color swatches
+        PolyElement(color = C_VALID_TF[1][1], strokecolor = C_VALID_TF[1][2], strokewidth = 1),
+        PolyElement(color = C_VALID_TF[2][1], strokecolor = C_VALID_TF[2][2], strokewidth = 1),
+        PolyElement(color = C_VALID_TF[3][1], strokecolor = C_VALID_TF[3][2], strokewidth = 1),
+    ]
+    legend_labels_list = [
+        "True trajectory", "Ensemble mean", "95% CI",
+        "Truth covered", "Truth not covered",
+        VALID_LABELS[1], VALID_LABELS[2], VALID_LABELS[3],
+    ]
+    Legend(fig[3, 1:3], legend_elems, legend_labels_list,
+        orientation = :horizontal, tellwidth = false, tellheight = true, nbanks = 1)
 
     save(joinpath(FIGDIR, "fig_ensemble_insights.pdf"), fig)
     println("  Saved fig_ensemble_insights.pdf")

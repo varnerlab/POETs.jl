@@ -1,0 +1,67 @@
+# Approximate data digitized from Butenas et al. 1999, Blood 94(7):2169-2178, Figure 3
+# Prothrombin titration on 200 µmol/L PCPS, 5 pmol/L TF-VIIa, no protein C pathway
+# All other factors at mean plasma concentrations (Table 1)
+# Units: time in minutes, thrombin in nmol/L
+# NOTE: These are approximate values from visual inspection of the published figure.
+# Replace with precise digitized values for final publication.
+time_min,thrombin_nM,condition
+0,0,FII_50pct
+1,0,FII_50pct
+2,0,FII_50pct
+3,3,FII_50pct
+4,25,FII_50pct
+5,105,FII_50pct
+6,125,FII_50pct
+7,90,FII_50pct
+8,55,FII_50pct
+10,18,FII_50pct
+12,7,FII_50pct
+14,3,FII_50pct
+0,0,FII_75pct
+1,0,FII_75pct
+2,1,FII_75pct
+3,8,FII_75pct
+4,60,FII_75pct
+5,185,FII_75pct
+6,195,FII_75pct
+7,140,FII_75pct
+8,75,FII_75pct
+10,25,FII_75pct
+12,10,FII_75pct
+14,4,FII_75pct
+0,0,FII_100pct
+1,0,FII_100pct
+2,2,FII_100pct
+3,15,FII_100pct
+4,120,FII_100pct
+5,300,FII_100pct
+6,270,FII_100pct
+7,170,FII_100pct
+8,90,FII_100pct
+10,30,FII_100pct
+12,12,FII_100pct
+14,5,FII_100pct
+0,0,FII_125pct
+1,0,FII_125pct
+2,3,FII_125pct
+3,35,FII_125pct
+4,280,FII_125pct
+5,520,FII_125pct
+6,420,FII_125pct
+7,250,FII_125pct
+8,130,FII_125pct
+10,45,FII_125pct
+12,18,FII_125pct
+14,8,FII_125pct
+0,0,FII_150pct
+1,0,FII_150pct
+2,5,FII_150pct
+3,60,FII_150pct
+4,450,FII_150pct
+5,750,FII_150pct
+6,600,FII_150pct
+7,350,FII_150pct
+8,180,FII_150pct
+10,60,FII_150pct
+12,25,FII_150pct
+14,10,FII_150pct

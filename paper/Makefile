@@ -11,6 +11,7 @@ $(MAIN).pdf: $(MAIN).tex references.bib
 	$(BIB) $(MAIN)
 	$(TEX) $(MAIN)
 	$(TEX) $(MAIN)
+	$(TEX) $(MAIN)
 
 clean:
 	rm -f $(MAIN).{aux,bbl,blg,log,out,pdf,toc,fls,fdb_latexmk,synctex.gz}
