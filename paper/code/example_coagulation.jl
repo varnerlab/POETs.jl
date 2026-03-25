@@ -188,45 +188,51 @@ include("paper_theme.jl")
 set_paper_theme!()
 
 println("\nGenerating coagulation figure...")
+
+# Visible CI band colors (distinct hues that pop against gray background)
+const C_CI_5pM  = RGBAf(0.90, 0.45, 0.10, 0.30)   # amber fill for 5 pM
+const C_CI_25pM = RGBAf(0.15, 0.65, 0.45, 0.30)    # teal fill for 25 pM
+const C_MEAN_5pM  = RGBf(0.85, 0.35, 0.05)          # dark amber for 5 pM mean
+const C_MEAN_25pM = RGBf(0.10, 0.50, 0.35)           # dark teal for 25 pM mean
+const C_DATA_5pM  = RGBf(0.70, 0.25, 0.00)           # brown for 5 pM data
+const C_DATA_25pM = RGBf(0.05, 0.40, 0.25)           # dark green for 25 pM data
+
 let
-    fig = Figure(size = (1000, 820))
+    fig = Figure(size = (1100, 820))
     sparse = 1:20:length(t_5pM)
 
-    # --- (a) Thrombin at 5 pM TF (with 95% CI band) ---
-    ax_a = Axis(fig[1, 1],
+    # --- (a) Thrombin at 5 pM & 25 pM TF combined ---
+    ax_a = Axis(fig[1, 1:2],
         xlabel = "Time (s)", ylabel = "Total thrombin (nM)",
-        title = "(a)  5 pM TF")
-    band!(ax_a, t_5pM, thr5_lo, thr5_hi, color = C_ENSEMBLE_FILL)
-    lines!(ax_a, t_5pM, thr5_mean, color = C_MEAN, linewidth = 2, linestyle = :dash)
-    scatter!(ax_a, t_5pM[sparse], data_5pM[sparse] .* 1e9, color = C_DATA, markersize = 4)
+        title = "(a)  Ensemble estimation: 5 pM and 25 pM TF")
+    # 5 pM TF
+    band!(ax_a, t_5pM, thr5_lo, thr5_hi, color = C_CI_5pM)
+    lines!(ax_a, t_5pM, thr5_mean, color = C_MEAN_5pM, linewidth = 2, linestyle = :dash)
+    scatter!(ax_a, t_5pM[sparse], data_5pM[sparse] .* 1e9, color = C_DATA_5pM, markersize = 5)
+    # 25 pM TF
+    band!(ax_a, t_25pM, thr25_lo, thr25_hi, color = C_CI_25pM)
+    lines!(ax_a, t_25pM, thr25_mean, color = C_MEAN_25pM, linewidth = 2, linestyle = :dash)
+    scatter!(ax_a, t_25pM[sparse], data_25pM[sparse] .* 1e9, color = C_DATA_25pM, markersize = 5)
 
-    # --- (b) Thrombin at 25 pM TF (with 95% CI band) ---
-    ax_b = Axis(fig[1, 2],
-        xlabel = "Time (s)", ylabel = "Total thrombin (nM)",
-        title = "(b)  25 pM TF")
-    band!(ax_b, t_25pM, thr25_lo, thr25_hi, color = C_ENSEMBLE_FILL)
-    lines!(ax_b, t_25pM, thr25_mean, color = C_MEAN, linewidth = 2, linestyle = :dash)
-    scatter!(ax_b, t_25pM[sparse], data_25pM[sparse] .* 1e9, color = C_DATA, markersize = 4)
-
-    # --- (c) Parameter recovery (log-log) ---
-    ax_c = Axis(fig[2, 1],
+    # --- (b) Parameter recovery (log-log) ---
+    ax_b = Axis(fig[2, 1],
         xlabel = "True value (log\u2081\u2080)", ylabel = "Estimated value (log\u2081\u2080)",
-        title = "(c)  Parameter recovery")
+        title = "(b)  Parameter recovery")
     for k in 1:min(n_valid, 200)
-        scatter!(ax_c, TRUE_LOG, PC[:, ens_idx_valid[k]],
+        scatter!(ax_b, TRUE_LOG, PC[:, ens_idx_valid[k]],
             color = (C_PE, 0.12), markersize = 3)
     end
     lims = (minimum(LOG_LOWER) - 0.5, maximum(LOG_UPPER) + 0.5)
-    lines!(ax_c, [lims[1], lims[2]], [lims[1], lims[2]],
+    lines!(ax_b, [lims[1], lims[2]], [lims[1], lims[2]],
         color = C_THEORY, linewidth = 1.5, linestyle = :dash)
     median_est = vec(median(PC[:, ens_idx_valid], dims=2))
-    scatter!(ax_c, TRUE_LOG, median_est, color = C_DATA, markersize = 8, marker = :diamond)
+    scatter!(ax_b, TRUE_LOG, median_est, color = C_DATA, markersize = 8, marker = :diamond)
 
-    # --- (d) Pareto front projection (log scale for visibility) ---
-    ax_d = Axis(fig[2, 2],
+    # --- (c) Pareto front projection (log scale for visibility) ---
+    ax_c = Axis(fig[2, 2],
         xlabel = "log\u2081\u2080(\u03b5\u2081, 5 pM TF)",
         ylabel = "log\u2081\u2080(\u03b5\u2082, 25 pM TF)",
-        title = "(d)  Pareto front")
+        title = "(c)  Pareto front")
 
     log_e1 = log10.(EC[1, :] .+ 1e-10)
     log_e2 = log10.(EC[2, :] .+ 1e-10)
@@ -236,21 +242,26 @@ let
     colors = [RGBAf(0.20 + 0.40*t, 0.45 + 0.25*t, 0.78 - 0.25*t, 0.55) for t in e3_norm]
 
     order = sortperm(RA, rev=true)
-    scatter!(ax_d, log_e1[order], log_e2[order], color = colors[order], markersize = 4)
+    scatter!(ax_c, log_e1[order], log_e2[order], color = colors[order], markersize = 4)
     p_idx = findall(RA .== 0)
-    scatter!(ax_d, log_e1[p_idx], log_e2[p_idx], color = C_FRONT, markersize = 6)
+    scatter!(ax_c, log_e1[p_idx], log_e2[p_idx], color = C_FRONT, markersize = 6)
 
     # Legend
-    elem_band = PolyElement(color = C_ENSEMBLE_FILL)
-    elem_mean = LineElement(color = C_MEAN, linewidth = 2, linestyle = :dash)
-    elem_data = MarkerElement(color = C_DATA, marker = :circle, markersize = 4)
+    elem_data5 = MarkerElement(color = C_DATA_5pM, marker = :circle, markersize = 5)
+    elem_mean5 = LineElement(color = C_MEAN_5pM, linewidth = 2, linestyle = :dash)
+    elem_band5 = PolyElement(color = C_CI_5pM)
+    elem_data25 = MarkerElement(color = C_DATA_25pM, marker = :circle, markersize = 5)
+    elem_mean25 = LineElement(color = C_MEAN_25pM, linewidth = 2, linestyle = :dash)
+    elem_band25 = PolyElement(color = C_CI_25pM)
     elem_identity = LineElement(color = C_THEORY, linewidth = 1.5, linestyle = :dash)
     elem_median = MarkerElement(color = C_DATA, marker = :diamond, markersize = 8)
     elem_front = MarkerElement(color = C_FRONT, marker = :circle, markersize = 6)
     Legend(fig[3, 1:2],
-        [elem_data, elem_mean, elem_band, elem_identity, elem_median, elem_front],
-        ["Noisy data", "Ensemble mean", "95% CI", "Identity line", "Median estimate", "Rank = 0"],
-        orientation = :horizontal, tellwidth = false, tellheight = true)
+        [elem_data5, elem_mean5, elem_band5, elem_data25, elem_mean25, elem_band25,
+         elem_identity, elem_median, elem_front],
+        ["Data (5 pM)", "Mean (5 pM)", "95% CI (5 pM)", "Data (25 pM)", "Mean (25 pM)", "95% CI (25 pM)",
+         "Identity line", "Median estimate", "Rank = 0"],
+        orientation = :horizontal, tellwidth = false, tellheight = true, nbanks = 2)
 
     save(joinpath(FIGDIR, "fig_coagulation.pdf"), fig)
     println("  Saved fig_coagulation.pdf")

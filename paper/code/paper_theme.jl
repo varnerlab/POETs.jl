@@ -26,7 +26,7 @@ const C_SEVERE = RGBf(0.80, 0.15, 0.15)
 # ──────────────────────────────────────────────────────────────
 function paper_theme()
     Theme(
-        fontsize = 11,
+        fontsize = 14,
         font = "CMU Serif",
         Axis = (
             backgroundcolor = RGBf(0.96, 0.96, 0.96),
@@ -41,15 +41,15 @@ function paper_theme()
             spinewidth = 0.8,
             xtickwidth = 0.8,
             ytickwidth = 0.8,
-            xlabelsize = 12,
-            ylabelsize = 12,
-            titlesize = 12,
-            xticklabelsize = 10,
-            yticklabelsize = 10,
+            xlabelsize = 16,
+            ylabelsize = 16,
+            titlesize = 16,
+            xticklabelsize = 13,
+            yticklabelsize = 13,
         ),
         Legend = (
             framevisible = false,
-            labelsize = 10,
+            labelsize = 13,
             patchsize = (15, 10),
         ),
     )
