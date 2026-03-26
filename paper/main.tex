@@ -5,6 +5,11 @@
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{float}
+\usepackage{etoolbox}
+
+% Force single spacing inside algorithm floats
+\AtBeginEnvironment{algorithm}{\def\baselinestretch{1}\selectfont}
+\AtEndEnvironment{algorithm}{}
 \usepackage{booktabs}
 \usepackage[hyphens]{url}
 \usepackage[hypertexnames=false]{hyperref}
