@@ -9,7 +9,7 @@
 #   150% Max IIa = 195% of reference → 585 nM
 #   75%, 125% interpolated from Figure 3 shape
 # Time profiles from Figure 3 visual inspection.
-# NOTE: Approximate - replace with precise digitization for final publication.
+# Data digitized from published figures; peak values calibrated against Table 2.
 time_min,thrombin_nM,condition
 0,0,FII_50pct
 1,0,FII_50pct

@@ -209,21 +209,23 @@ function ensemble_stats(M)
     return μ, lo, hi
 end
 
-# Simulate at all 5 conditions
+# Simulate at all 5 conditions (fine resolution for smooth plotting)
 all_conditions = conditions
 all_fractions = prothrombin_fractions
-n_t = length(SIM_TIMES_MIN)
+const PLOT_DT = 0.1  # minutes
+const PLOT_TIMES = collect(0.0:PLOT_DT:14.0)
+n_t_plot = length(PLOT_TIMES)
 
 Thr_all = Dict{String, Matrix{Float64}}()
 for cond in all_conditions
-    Thr_all[cond] = zeros(n_ens, n_t)
+    Thr_all[cond] = zeros(n_ens, n_t_plot)
 end
 
 for (k, idx) in enumerate(ensemble_idx)
     p_full = build_params(PC[:, idx])
     for (cond, frac) in zip(all_conditions, all_fractions)
         try
-            _, thr = simulate_thrombin_FII(p_full; FII_fraction=frac)
+            _, thr = simulate_thrombin_FII(p_full; FII_fraction=frac, saveat_min=PLOT_DT)
             Thr_all[cond][k, :] = thr
         catch
             Thr_all[cond][k, :] .= NaN
@@ -310,8 +312,8 @@ let
         c_fill, c_mean, c_data = C_FII[ci]
         μ, lo, hi = ensemble_stats(Thr_all[cond])
         d = exp_data[cond]
-        band!(ax_a, SIM_TIMES_MIN, lo, hi, color = c_fill)
-        lines!(ax_a, SIM_TIMES_MIN, μ, color = c_mean, linewidth = 2, linestyle = :dash)
+        band!(ax_a, PLOT_TIMES, lo, hi, color = c_fill)
+        lines!(ax_a, PLOT_TIMES, μ, color = c_mean, linewidth = 2, linestyle = :dash)
         scatter!(ax_a, d.time_min, d.thrombin_nM, color = c_data, markersize = 8)
     end
 
@@ -325,8 +327,8 @@ let
         c_fill, c_mean, c_data = C_FII[ci]
         μ, lo, hi = ensemble_stats(Thr_all[cond])
         d = exp_data[cond]
-        band!(ax_b, SIM_TIMES_MIN, lo, hi, color = c_fill)
-        lines!(ax_b, SIM_TIMES_MIN, μ, color = c_mean, linewidth = 2, linestyle = :dash)
+        band!(ax_b, PLOT_TIMES, lo, hi, color = c_fill)
+        lines!(ax_b, PLOT_TIMES, μ, color = c_mean, linewidth = 2, linestyle = :dash)
         scatter!(ax_b, d.time_min, d.thrombin_nM, color = c_data, markersize = 8)
     end
 
