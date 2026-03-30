@@ -130,7 +130,9 @@ Pseudocode for all algorithmic components, software design details, and the publ
 % ============================================================
 \section{Results}\label{sec:results}
 We first validated ParetoEnsembles.jl on two standard multiobjective benchmarks, the constrained Binh--Korn problem~\cite{Binh1997} and the unconstrained Fonseca--Fleming problem~\cite{Fonseca1995}, recovering the known Pareto fronts in both cases (\cref{sec:si_benchmarks}).
-A head-to-head comparison with NSGA-II~\cite{Deb2002} at matched evaluation budgets (${\sim}110{,}000$) showed that ParetoEnsembles.jl achieves comparable hypervolume and 5--7$\times$ lower inverted generational distance while producing 10--30$\times$ denser fronts (\cref{sec:si_nsga}), and a hyperparameter sensitivity analysis confirmed robustness to the choice of rank cutoff, cooling rate, and iterations per temperature (\cref{sec:si_sensitivity}).
+A head-to-head comparison with NSGA-II~\cite{Deb2002} at matched evaluation budgets (${\sim}110{,}000$) showed that ParetoEnsembles.jl achieves comparable hypervolume (the volume of objective space covered by the front, where larger is better), 5--7$\times$ lower inverted generational distance (the average distance from the true front to the computed front, where lower indicates a closer approximation), and 10--30$\times$ denser fronts with thousands of retained solutions compared with ${\sim}200$ for NSGA-II (\cref{sec:si_nsga}).
+A hyperparameter sensitivity analysis confirmed robustness to the choice of rank cutoff, cooling rate, and iterations per temperature (\cref{sec:si_sensitivity}).
+Thus, ParetoEnsembles.jl produces denser and more complete approximations of the trade-off surface, enabling the downstream uncertainty analyses presented below, but at the cost of longer wall-clock times (50--150$\times$ slower than NSGA-II) due to the inherently sequential nature of simulated annealing chains.
 We focus here on two biological applications that illustrate the practical value of ensemble-based parameter estimation.
 
 \subsection{Cell-free gene expression}\label{sec:cellfree}
