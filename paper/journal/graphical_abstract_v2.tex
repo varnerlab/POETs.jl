@@ -15,55 +15,66 @@
 \begin{document}
 \begin{tikzpicture}[>=Stealth, every node/.style={font=\sffamily}]
 
-% Panel backgrounds
-\fill[panelbg, rounded corners=6pt] (0, 0) rectangle (4.4, 7.0);
-\fill[panelbg!85!white, rounded corners=6pt] (4.8, 0) rectangle (10.0, 7.0);
-\fill[panelbg, rounded corners=6pt] (10.4, 0) rectangle (18.0, 7.0);
+% ── Panel geometry ──
+% Wider gaps between panels so arrows have room
+\def\ph{7.0}
+% Left: 0 to 4.4    Center: 5.1 to 10.3    Right: 11.0 to 18.6
+% Gaps: 0.7cm each (room for real arrows)
+\fill[panelbg, rounded corners=6pt] (0, 0) rectangle (4.4, \ph);
+\fill[panelbg!85!white, rounded corners=6pt] (5.1, 0) rectangle (10.3, \ph);
+\fill[panelbg, rounded corners=6pt] (11.0, 0) rectangle (18.6, \ph);
 
 % ════════════════════════════════════════════
 % TOP TITLE
 % ════════════════════════════════════════════
-\node[font=\sffamily\large\bfseries, text=darktext] at (9.0, 7.8) {ParetoEnsembles.jl};
-\node[font=\sffamily\small, text=midgray] at (9.0, 7.4) {%
+\node[font=\sffamily\large\bfseries, text=darktext] at (9.3, 7.8) {ParetoEnsembles.jl};
+\node[font=\sffamily\small, text=midgray] at (9.3, 7.4) {%
     Multiobjective parameter ensembles for uncertainty characterization%
 };
 
 % ════════════════════════════════════════════
+% All three panel titles at SAME y, with subtitles at SAME y
+% ════════════════════════════════════════════
+\def\titleY{6.68}
+\def\subtitleY{6.38}
+
+% ════════════════════════════════════════════
 % LEFT: Single Best Fit
 % ════════════════════════════════════════════
-\node[font=\sffamily\bfseries\small, text=darktext] at (2.2, 6.7) {Single Best Fit};
+\node[font=\sffamily\bfseries\small, text=darktext] at (2.2, \titleY) {Single Best Fit};
+\node[font=\sffamily\scriptsize\itshape, text=midgray] at (2.2, \subtitleY) {One parameter vector};
 
-\fill[lightgray, rounded corners=3pt] (0.3, 3.2) rectangle (4.1, 6.3);
-\draw[midgray!50, line width=0.3pt, rounded corners=3pt] (0.3, 3.2) rectangle (4.1, 6.3);
+\fill[lightgray, rounded corners=3pt] (0.3, 3.2) rectangle (4.1, 6.05);
+\draw[midgray!50, line width=0.3pt, rounded corners=3pt] (0.3, 3.2) rectangle (4.1, 6.05);
 \begin{scope}[shift={(0.3, 3.2)}, clip]
-    \clip (0,0) rectangle (3.8, 3.1);
+    \clip (0,0) rectangle (3.8, 2.85);
     \draw[steelblue, line width=1.5pt]
-        (0.2,0.3) -- (0.6,0.45) -- (1.0,1.0) -- (1.4,1.9) -- (1.8,2.4) -- (2.2,2.3) -- (2.6,1.8) -- (3.0,1.1) -- (3.4,0.5) -- (3.6,0.35);
-    \foreach \x/\y/\e in {0.5/0.4/0.2, 1.0/0.9/0.25, 1.5/2.0/0.3, 2.0/2.2/0.3, 2.5/1.9/0.25, 3.0/1.05/0.2, 3.4/0.45/0.15} {
+        (0.2,0.3) -- (0.6,0.45) -- (1.0,1.0) -- (1.4,1.8) -- (1.8,2.3) -- (2.2,2.2) -- (2.6,1.7) -- (3.0,1.0) -- (3.4,0.45) -- (3.6,0.3);
+    \foreach \x/\y/\e in {0.5/0.4/0.2, 1.0/0.9/0.25, 1.5/1.9/0.3, 2.0/2.1/0.3, 2.5/1.8/0.25, 3.0/0.95/0.2, 3.4/0.4/0.15} {
         \draw[darktext!60, line width=0.4pt] (\x, {\y-\e}) -- (\x, {\y+\e});
         \fill[darktext] (\x, \y) circle (1.8pt);
     }
 \end{scope}
 \node[font=\sffamily\tiny, text=midgray] at (2.2, 3.0) {One trajectory, no uncertainty};
 
-\node[anchor=north, text width=3.8cm, align=center, font=\scriptsize, text=darktext]
+\node[anchor=north, text width=4.0cm, align=center, font=\scriptsize, text=darktext]
     at (2.2, 2.65) {%
     How well constrained\\are the parameters?\\[6pt]
     Which predictions\\can we trust?\\[6pt]
-    {\footnotesize\itshape\color{midgray} Trade-off structure is hidden.}
+    \mbox{\footnotesize\itshape\color{midgray} Trade-off structure is hidden.}
 };
 
 % ════════════════════════════════════════════
 % CENTER: Pareto Ensemble
 % ════════════════════════════════════════════
-\node[font=\sffamily\bfseries\small, text=darktext] at (7.4, 6.7) {Pareto Ensemble};
-\node[font=\sffamily\scriptsize\itshape, text=midgray] at (7.4, 6.4) {Simulated annealing with dominance ranking};
+\node[font=\sffamily\bfseries\small, text=darktext] at (7.7, \titleY) {Pareto Ensemble};
+\node[font=\sffamily\scriptsize\itshape, text=midgray] at (7.7, \subtitleY) {Simulated annealing with dominance ranking};
 
-\fill[lightgray, rounded corners=3pt] (5.1, 1.3) rectangle (9.7, 6.0);
-\draw[midgray!50, line width=0.3pt, rounded corners=3pt] (5.1, 1.3) rectangle (9.7, 6.0);
+\fill[lightgray, rounded corners=3pt] (5.4, 1.3) rectangle (10.0, 6.05);
+\draw[midgray!50, line width=0.3pt, rounded corners=3pt] (5.4, 1.3) rectangle (10.0, 6.05);
 
-\begin{scope}[shift={(5.1, 1.3)}, clip]
-    \clip (0,0) rectangle (4.6, 4.7);
+\begin{scope}[shift={(5.4, 1.3)}, clip]
+    \clip (0,0) rectangle (4.6, 4.75);
     % Near-optimal cloud
     \foreach \x/\y in {
         0.5/4.0, 0.65/3.6, 0.8/3.2, 0.85/3.5, 0.95/2.9, 1.0/3.3,
@@ -89,16 +100,16 @@
         \fill[darktext!85] (\x, \y) circle (2.5pt);
     }
 \end{scope}
-% Axis labels (inside panel)
-\node[font=\sffamily\scriptsize, text=midgray] at (7.4, 1.1) {$\varepsilon_1$ (Objective 1)};
-\node[font=\sffamily\scriptsize, text=midgray, rotate=90] at (5.25, 3.65) {$\varepsilon_2$ (Objective 2)};
+% Axis labels
+\node[font=\sffamily\scriptsize, text=midgray] at (7.7, 1.1) {$\varepsilon_1$ (Objective 1)};
+\node[font=\sffamily\scriptsize, text=midgray, rotate=90] at (5.55, 3.65) {$\varepsilon_2$ (Objective 2)};
 % Legend
-\fill[darktext!85] (5.8, 0.75) circle (2.5pt);
-\node[font=\sffamily\tiny, text=darktext, anchor=west] at (5.95, 0.75) {Pareto front};
-\fill[steelblue!30] (7.2, 0.75) circle (2pt);
-\node[font=\sffamily\tiny, text=darktext, anchor=west] at (7.35, 0.75) {Near-optimal};
+\fill[darktext!85] (6.1, 0.75) circle (2.5pt);
+\node[font=\sffamily\tiny, text=darktext, anchor=west] at (6.25, 0.75) {Pareto front};
+\fill[steelblue!30] (7.5, 0.75) circle (2pt);
+\node[font=\sffamily\tiny, text=darktext, anchor=west] at (7.65, 0.75) {Near-optimal};
 % Features
-\node[font=\sffamily\tiny, text=midgray] at (7.4, 0.35) {%
+\node[font=\sffamily\tiny, text=midgray] at (7.7, 0.35) {%
     Strict dominance\enspace$\cdot$\enspace
     $O(nm)$ ranking\enspace$\cdot$\enspace
     Multi-chain parallel%
@@ -107,13 +118,14 @@
 % ════════════════════════════════════════════
 % RIGHT: Ensemble Analyses
 % ════════════════════════════════════════════
-\node[font=\sffamily\bfseries\small, text=darktext] at (14.2, 6.7) {Ensemble Analyses};
+\node[font=\sffamily\bfseries\small, text=darktext] at (14.8, \titleY) {Ensemble Analyses};
+\node[font=\sffamily\scriptsize\itshape, text=midgray] at (14.8, \subtitleY) {Uncertainty characterization from the ensemble};
 
-% ── Top: Held-out predictions ──
-\fill[lightgray, rounded corners=3pt] (10.7, 4.1) rectangle (17.7, 6.35);
-\draw[midgray!50, line width=0.3pt, rounded corners=3pt] (10.7, 4.1) rectangle (17.7, 6.35);
-\begin{scope}[shift={(10.7, 4.1)}, clip]
-    \clip (0,0) rectangle (7.0, 2.25);
+% ── Top: Held-out predictions (full width, with legend INSIDE) ──
+\fill[lightgray, rounded corners=3pt] (11.3, 3.75) rectangle (18.3, 6.05);
+\draw[midgray!50, line width=0.3pt, rounded corners=3pt] (11.3, 3.75) rectangle (18.3, 6.05);
+\begin{scope}[shift={(11.3, 3.75)}, clip]
+    \clip (0,0) rectangle (7.0, 2.3);
     % Faint ensemble trajectories
     \foreach \yoff in {-0.1, -0.05, 0, 0.05, 0.1, -0.07, 0.07, -0.03, 0.03} {
         \draw[steelblue!15, line width=0.5pt]
@@ -134,28 +146,32 @@
         \fill[darktext] (\x, \y) circle (1.8pt);
     }
 \end{scope}
-% Legend below predictions (two lines: legend then bold title)
-\draw[steelblue, line width=1pt] (10.8, 3.88) -- ++(0.35, 0);
-\node[font=\sffamily\tiny, text=darktext, anchor=west] at (11.22, 3.88) {Mean};
-\draw[darktext, line width=0.6pt, dashed] (11.9, 3.88) -- ++(0.35, 0);
-\node[font=\sffamily\tiny, text=darktext, anchor=west] at (12.32, 3.88) {True};
-\fill[steelblue!15] (12.85, 3.81) rectangle ++(0.2, 0.14);
-\draw[steelblue!30, line width=0.2pt] (12.85, 3.81) rectangle ++(0.2, 0.14);
-\node[font=\sffamily\tiny, text=darktext, anchor=west] at (13.12, 3.88) {95\% CI};
-\fill[darktext] (13.7, 3.88) circle (1.5pt);
-\node[font=\sffamily\tiny, text=darktext, anchor=west] at (13.85, 3.88) {Data};
-\node[font=\sffamily\tiny\bfseries, text=darktext] at (14.2, 3.65) {Held-out predictions with uncertainty};
+% Legend INSIDE the plot (top-left, empty area before curves rise)
+\pgfmathsetmacro{\ilx}{11.3 + 0.15}
+\pgfmathsetmacro{\ily}{3.75 + 2.3 - 0.22}
+\draw[steelblue, line width=1pt] (\ilx, \ily) -- ++(0.35, 0);
+\node[font=\sffamily\tiny, text=darktext, anchor=west] at ({\ilx + 0.42}, \ily) {Mean};
+\draw[darktext, line width=0.6pt, dashed] ({\ilx + 1.15}, \ily) -- ++(0.35, 0);
+\node[font=\sffamily\tiny, text=darktext, anchor=west] at ({\ilx + 1.57}, \ily) {True};
+\fill[steelblue!15] ({\ilx + 2.15}, {\ily - 0.07}) rectangle ++(0.2, 0.14);
+\draw[steelblue!30, line width=0.2pt] ({\ilx + 2.15}, {\ily - 0.07}) rectangle ++(0.2, 0.14);
+\node[font=\sffamily\tiny, text=darktext, anchor=west] at ({\ilx + 2.42}, \ily) {95\% CI};
+\fill[darktext] ({\ilx + 3.1}, \ily) circle (1.5pt);
+\node[font=\sffamily\tiny, text=darktext, anchor=west] at ({\ilx + 3.22}, \ily) {Data};
+% Title below the predictions panel
+\node[font=\sffamily\tiny\bfseries, text=darktext] at (14.8, 3.55) {Held-out predictions with uncertainty};
 
 % ── Bottom-left: Correlation heatmap ──
-\fill[lightgray, rounded corners=3pt] (10.7, 0.3) rectangle (14.0, 3.35);
-\draw[midgray!50, line width=0.3pt, rounded corners=3pt] (10.7, 0.3) rectangle (14.0, 3.35);
-% SYMMETRIC 8×8 correlation heatmap
+\fill[lightgray, rounded corners=3pt] (11.3, 0.3) rectangle (14.7, 3.25);
+\draw[midgray!50, line width=0.3pt, rounded corners=3pt] (11.3, 0.3) rectangle (14.7, 3.25);
+% Center the heatmap+colorbar complex in the panel
+% Panel inner width: 14.7 - 11.3 = 3.4cm
+% Heatmap: 8*0.24 = 1.92cm. Colorbar: 0.12 + gap 0.12 = 0.24. Labels: ~0.3cm. Total ~2.46cm
+% Y-axis label: ~0.3cm on left. Total complex width: ~2.76cm. Left margin: (3.4-2.76)/2 = 0.32
 \def\cs{0.24}
-\pgfmathsetmacro{\hmox}{10.7 + 0.45}
-\pgfmathsetmacro{\hmoy}{0.3 + 0.5}
-% Define upper triangle + diagonal; mirror for lower triangle
-% Diagonal: all steelblue!85
-% Upper triangle values (i < j mapped to row j, col i):
+\pgfmathsetmacro{\hmox}{11.3 + 0.65}
+\pgfmathsetmacro{\hmoy}{0.3 + 0.55}
+% Symmetric 8×8 correlation heatmap
 \foreach \i/\j/\c in {
     0/7/steelblue!85, 1/7/coral!50,    2/7/steelblue!20, 3/7/coral!65,    4/7/steelblue!25, 5/7/coral!30, 6/7/steelblue!15, 7/7/coral!40,
     0/6/coral!50,     1/6/steelblue!85, 2/6/steelblue!40, 3/6/coral!15,    4/6/coral!40,     5/6/steelblue!20, 6/6/coral!55, 7/6/steelblue!30,
@@ -191,54 +207,54 @@
 \node[font=\sffamily\tiny, text=midgray, anchor=west] at ({\cbx + 0.16}, {\hmoy + \cbh/2}) {$r$};
 \node[font=\sffamily\tiny, text=midgray, anchor=west] at ({\cbx + 0.16}, {\hmoy + \cbh}) {$\text{+}1$};
 % Title
-\node[font=\sffamily\tiny\bfseries, text=darktext] at (12.35, 0.1) {Parameter correlations};
+\node[font=\sffamily\tiny\bfseries, text=darktext] at (13.0, 0.1) {Parameter correlations};
 
 % ── Bottom-right: Patient-specific predictions ──
-\fill[lightgray, rounded corners=3pt] (14.4, 0.3) rectangle (17.7, 3.35);
-\draw[midgray!50, line width=0.3pt, rounded corners=3pt] (14.4, 0.3) rectangle (17.7, 3.35);
-\begin{scope}[shift={(14.4, 0.3)}, clip]
-    \clip (0,0) rectangle (3.3, 3.05);
+\fill[lightgray, rounded corners=3pt] (15.1, 0.3) rectangle (18.3, 3.25);
+\draw[midgray!50, line width=0.3pt, rounded corners=3pt] (15.1, 0.3) rectangle (18.3, 3.25);
+\begin{scope}[shift={(15.1, 0.3)}, clip]
+    \clip (0,0) rectangle (3.2, 2.95);
     % Normal
     \fill[steelblue!10]
-        (0.15,0.15) -- (0.5,0.2) -- (0.9,0.7) -- (1.3,1.9) -- (1.7,2.5) -- (2.1,2.3) -- (2.5,1.4) -- (2.9,0.6) -- (3.15,0.3)
-        -- (3.15,0.12) -- (2.9,0.3) -- (2.5,1.0) -- (2.1,1.8) -- (1.7,2.0) -- (1.3,1.5) -- (0.9,0.35) -- (0.5,0.08) -- (0.15,0.05) -- cycle;
+        (0.15,0.15) -- (0.5,0.2) -- (0.85,0.65) -- (1.2,1.75) -- (1.55,2.35) -- (1.9,2.15) -- (2.25,1.3) -- (2.6,0.55) -- (2.95,0.28)
+        -- (2.95,0.1) -- (2.6,0.28) -- (2.25,0.92) -- (1.9,1.7) -- (1.55,1.88) -- (1.2,1.38) -- (0.85,0.32) -- (0.5,0.08) -- (0.15,0.05) -- cycle;
     \draw[steelblue, line width=1pt]
-        (0.15,0.1) -- (0.5,0.14) -- (0.9,0.52) -- (1.3,1.7) -- (1.7,2.25) -- (2.1,2.05) -- (2.5,1.2) -- (2.9,0.45) -- (3.15,0.21);
+        (0.15,0.1) -- (0.5,0.14) -- (0.85,0.48) -- (1.2,1.56) -- (1.55,2.11) -- (1.9,1.92) -- (2.25,1.11) -- (2.6,0.41) -- (2.95,0.19);
     % Mild
     \fill[amber!8]
-        (0.15,0.1) -- (0.5,0.12) -- (0.9,0.35) -- (1.3,1.15) -- (1.7,1.55) -- (2.1,1.4) -- (2.5,0.85) -- (2.9,0.35) -- (3.15,0.18)
-        -- (3.15,0.07) -- (2.9,0.15) -- (2.5,0.5) -- (2.1,1.0) -- (1.7,1.1) -- (1.3,0.75) -- (0.9,0.15) -- (0.5,0.05) -- (0.15,0.03) -- cycle;
+        (0.15,0.1) -- (0.5,0.12) -- (0.85,0.32) -- (1.2,1.05) -- (1.55,1.45) -- (1.9,1.3) -- (2.25,0.78) -- (2.6,0.32) -- (2.95,0.16)
+        -- (2.95,0.06) -- (2.6,0.14) -- (2.25,0.46) -- (1.9,0.92) -- (1.55,1.02) -- (1.2,0.68) -- (0.85,0.14) -- (0.5,0.04) -- (0.15,0.03) -- cycle;
     \draw[amber, line width=1pt]
-        (0.15,0.06) -- (0.5,0.08) -- (0.9,0.25) -- (1.3,0.95) -- (1.7,1.32) -- (2.1,1.2) -- (2.5,0.67) -- (2.9,0.25) -- (3.15,0.12);
+        (0.15,0.06) -- (0.5,0.08) -- (0.85,0.23) -- (1.2,0.86) -- (1.55,1.23) -- (1.9,1.11) -- (2.25,0.62) -- (2.6,0.23) -- (2.95,0.11);
     % Severe
     \fill[coral!6]
-        (0.15,0.06) -- (0.5,0.07) -- (0.9,0.17) -- (1.3,0.55) -- (1.7,0.75) -- (2.1,0.68) -- (2.5,0.42) -- (2.9,0.2) -- (3.15,0.1)
-        -- (3.15,0.03) -- (2.9,0.08) -- (2.5,0.22) -- (2.1,0.4) -- (1.7,0.45) -- (1.3,0.28) -- (0.9,0.07) -- (0.5,0.02) -- (0.15,0.01) -- cycle;
+        (0.15,0.06) -- (0.5,0.07) -- (0.85,0.16) -- (1.2,0.5) -- (1.55,0.7) -- (1.9,0.63) -- (2.25,0.38) -- (2.6,0.18) -- (2.95,0.09)
+        -- (2.95,0.03) -- (2.6,0.07) -- (2.25,0.2) -- (1.9,0.37) -- (1.55,0.42) -- (1.2,0.26) -- (0.85,0.06) -- (0.5,0.02) -- (0.15,0.01) -- cycle;
     \draw[coral, line width=1pt]
-        (0.15,0.03) -- (0.5,0.04) -- (0.9,0.12) -- (1.3,0.41) -- (1.7,0.6) -- (2.1,0.54) -- (2.5,0.32) -- (2.9,0.14) -- (3.15,0.06);
+        (0.15,0.03) -- (0.5,0.04) -- (0.85,0.11) -- (1.2,0.38) -- (1.55,0.56) -- (1.9,0.5) -- (2.25,0.29) -- (2.6,0.12) -- (2.95,0.06);
 \end{scope}
-% Legend
-\draw[steelblue, line width=0.8pt] (14.55, 3.1) -- ++(0.3, 0);
-\node[font=\sffamily\tiny, text=darktext, anchor=west] at (14.9, 3.1) {Normal};
-\draw[amber, line width=0.8pt] (14.55, 2.9) -- ++(0.3, 0);
-\node[font=\sffamily\tiny, text=darktext, anchor=west] at (14.9, 2.9) {Mild};
-\draw[coral, line width=0.8pt] (14.55, 2.7) -- ++(0.3, 0);
-\node[font=\sffamily\tiny, text=darktext, anchor=west] at (14.9, 2.7) {Severe};
+% Legend (stacked, top-left inside panel)
+\draw[steelblue, line width=0.8pt] (15.25, 3.0) -- ++(0.3, 0);
+\node[font=\sffamily\tiny, text=darktext, anchor=west] at (15.6, 3.0) {Normal};
+\draw[amber, line width=0.8pt] (15.25, 2.8) -- ++(0.3, 0);
+\node[font=\sffamily\tiny, text=darktext, anchor=west] at (15.6, 2.8) {Mild};
+\draw[coral, line width=0.8pt] (15.25, 2.6) -- ++(0.3, 0);
+\node[font=\sffamily\tiny, text=darktext, anchor=west] at (15.6, 2.6) {Severe};
 % Title
-\node[font=\sffamily\tiny\bfseries, text=darktext] at (16.05, 0.1) {Patient-specific predictions};
+\node[font=\sffamily\tiny\bfseries, text=darktext] at (16.7, 0.1) {Patient-specific predictions};
 
 % ════════════════════════════════════════════
-% ARROWS (span the full gap between panels)
+% ARROWS (span full gap, real visible arrows)
 % ════════════════════════════════════════════
 \draw[-{Stealth[length=9pt,width=7pt]}, line width=3pt, color=steelblue!45]
-    (4.45, 3.5) -- (4.75, 3.5);
+    (4.42, 3.5) -- (5.08, 3.5);
 \draw[-{Stealth[length=9pt,width=7pt]}, line width=3pt, color=steelblue!45]
-    (10.05, 3.5) -- (10.35, 3.5);
+    (10.32, 3.5) -- (10.98, 3.5);
 
 % ════════════════════════════════════════════
 % Bottom tagline
 % ════════════════════════════════════════════
-\node[font=\sffamily\footnotesize, text=midgray] at (9.0, -0.5) {
+\node[font=\sffamily\footnotesize, text=midgray] at (9.3, -0.5) {
     Open-source Julia package \textcolor{midgray!50}{$\vert$}\
     Callback-based API \textcolor{midgray!50}{$\vert$}\
     Minimal dependencies \textcolor{midgray!50}{$\vert$}\
