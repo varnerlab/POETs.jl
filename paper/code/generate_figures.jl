@@ -16,8 +16,8 @@ const CACHE_FILE = joinpath(CACHEDIR, "benchmarks_results.jld2")
 # ──────────────────────────────────────────────────────────────
 # Shared styling
 # ──────────────────────────────────────────────────────────────
-const MARKER_SIZE_PARETO = 4
-const MARKER_SIZE_NEAR   = 6
+const MARKER_SIZE_PARETO = 7
+const MARKER_SIZE_NEAR   = 9
 
 # Color by rank: near-optimal are prominent colored points,
 # Pareto front is a subtle dark line through the cloud.

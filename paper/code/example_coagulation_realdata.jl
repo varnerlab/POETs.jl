@@ -323,9 +323,9 @@ let
         d = exp_data[cond]
         band!(ax_a, PLOT_TIMES, lo, hi, color = c_fill)
         lines!(ax_a, PLOT_TIMES, μ, color = c_mean, linewidth = 2, linestyle = :dash)
-        scatter!(ax_a, d.time_min, d.thrombin_nM, color = c_data, markersize = 8, label = label)
+        scatter!(ax_a, d.time_min, d.thrombin_nM, color = c_data, markersize = 11, label = label)
     end
-    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 11)
+    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 15)
 
     # --- (b) Held-out predictions ---
     ax_b = Axis(fig[1, 2],
@@ -339,9 +339,9 @@ let
         d = exp_data[cond]
         band!(ax_b, PLOT_TIMES, lo, hi, color = c_fill)
         lines!(ax_b, PLOT_TIMES, μ, color = c_mean, linewidth = 2, linestyle = :dash)
-        scatter!(ax_b, d.time_min, d.thrombin_nM, color = c_data, markersize = 8, label = label)
+        scatter!(ax_b, d.time_min, d.thrombin_nM, color = c_data, markersize = 11, label = label)
     end
-    axislegend(ax_b, position = :rt, framevisible = false, labelsize = 11)
+    axislegend(ax_b, position = :rt, framevisible = false, labelsize = 15)
 
     # --- (c) Pareto front ---
     ax_c = Axis(fig[2, 1],
@@ -356,10 +356,10 @@ let
     colors = [RGBAf(0.20 + 0.40*t, 0.45 + 0.25*t, 0.78 - 0.25*t, 0.55) for t in e3_norm]
 
     order = sortperm(RA, rev=true)
-    scatter!(ax_c, log_e1[order], log_e2[order], color = colors[order], markersize = 4, label = "Near-optimal")
+    scatter!(ax_c, log_e1[order], log_e2[order], color = colors[order], markersize = 7, label = "Near-optimal")
     p_idx = findall(RA .== 0)
-    scatter!(ax_c, log_e1[p_idx], log_e2[p_idx], color = C_FRONT, markersize = 6, label = "Pareto front")
-    axislegend(ax_c, position = :rb, framevisible = false, labelsize = 11)
+    scatter!(ax_c, log_e1[p_idx], log_e2[p_idx], color = C_FRONT, markersize = 9, label = "Pareto front")
+    axislegend(ax_c, position = :rb, framevisible = false, labelsize = 15)
 
     # --- (d) Parameter estimates vs nominal ---
     ax_d = Axis(fig[2, 2],
@@ -370,11 +370,11 @@ let
         color = C_THEORY, linewidth = 1.5, linestyle = :dash, label = "Identity")
     for k in 1:min(n_valid, 200)
         scatter!(ax_d, NOMINAL_LOG, PC[:, ens_idx_valid[k]],
-            color = (C_PE, 0.08), markersize = 6)
+            color = (C_PE, 0.08), markersize = 9)
     end
     median_est = vec(median(PC[:, ens_idx_valid], dims=2))
-    scatter!(ax_d, NOMINAL_LOG, median_est, color = C_DATA, markersize = 10, marker = :diamond, label = "Median estimate")
-    axislegend(ax_d, position = :rb, framevisible = false, labelsize = 11)
+    scatter!(ax_d, NOMINAL_LOG, median_est, color = C_DATA, markersize = 13, marker = :diamond, label = "Median estimate")
+    axislegend(ax_d, position = :rb, framevisible = false, labelsize = 15)
 
     save(joinpath(FIGDIR, "fig_coagulation_realdata.pdf"), fig)
     println("  Saved fig_coagulation_realdata.pdf")

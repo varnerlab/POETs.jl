@@ -67,8 +67,8 @@ let
     band!(ax_a, t_fine, m_lo, m_hi, color = RGBAf(0.20, 0.45, 0.78, 0.15))
     lines!(ax_a, t_fine, m_mean, color = C_MEAN, linewidth = 2, label = "Ensemble mean")
     errorbars!(ax_a, T_OBS, m_data, m_err, color = C_DATA, whiskerwidth = 5)
-    scatter!(ax_a, T_OBS, m_data, color = C_DATA, markersize = 7, label = "Exp. data")
-    axislegend(ax_a, position = :rb, framevisible = false, labelsize = 11)
+    scatter!(ax_a, T_OBS, m_data, color = C_DATA, markersize = 10, label = "Exp. data")
+    axislegend(ax_a, position = :rb, framevisible = false, labelsize = 15)
 
     # (b) Protein — solid = ensemble mean, scatter = experimental data
     ax_b = Axis(fig[1, 2], xlabel = "Time (h)", ylabel = "Protein deGFP (μM)",
@@ -76,8 +76,8 @@ let
     band!(ax_b, t_fine, p_lo ./ 1000, p_hi ./ 1000, color = RGBAf(0.20, 0.45, 0.78, 0.15))
     lines!(ax_b, t_fine, p_mean ./ 1000, color = C_MEAN, linewidth = 2, label = "Ensemble mean")
     errorbars!(ax_b, T_OBS, p_data_uM, p_err_uM, color = C_DATA, whiskerwidth = 5)
-    scatter!(ax_b, T_OBS, p_data_uM, color = C_DATA, markersize = 7, label = "Exp. data")
-    axislegend(ax_b, position = :rb, framevisible = false, labelsize = 11)
+    scatter!(ax_b, T_OBS, p_data_uM, color = C_DATA, markersize = 10, label = "Exp. data")
+    axislegend(ax_b, position = :rb, framevisible = false, labelsize = 15)
 
     # (c) Pareto front
     ax_c = Axis(fig[1, 3], xlabel = "log₁₀(ε mRNA)", ylabel = "log₁₀(ε protein)",
@@ -86,9 +86,9 @@ let
     log_e2 = log10.(EC_cf[2, :] .+ 1e-10)
     n_idx = RA_cf .> 0
     p_idx = RA_cf .== 0
-    scatter!(ax_c, log_e1[n_idx], log_e2[n_idx], color = (C_PE, 0.3), markersize = 4, label = "Near-optimal")
-    scatter!(ax_c, log_e1[p_idx], log_e2[p_idx], color = C_FRONT, markersize = 6, label = "Pareto front")
-    axislegend(ax_c, position = :rt, framevisible = false, labelsize = 11)
+    scatter!(ax_c, log_e1[n_idx], log_e2[n_idx], color = (C_PE, 0.3), markersize = 7, label = "Near-optimal")
+    scatter!(ax_c, log_e1[p_idx], log_e2[p_idx], color = C_FRONT, markersize = 9, label = "Pareto front")
+    axislegend(ax_c, position = :rt, framevisible = false, labelsize = 15)
 
     safe_save(joinpath(FIGDIR, "fig_cellfree.pdf"), fig)
     copy_to_arxiv("fig_cellfree.pdf")
@@ -133,7 +133,7 @@ let
             color = c_true, linewidth = 1, linestyle = :dash)
     end
     lines!(ax_a, [NaN], [NaN], color = C_TRUE, linewidth = 1, linestyle = :dash, label = "True")
-    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 11)
+    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 15)
 
     # (b) Correlation heatmap
     ax_b = Axis(fig[1, 3], title = "(b)  Parameter correlations",
@@ -157,7 +157,7 @@ let
         lines!(ax_c, train_times_fine[1], true_traj .* 1e9, color = C_TRUE, linewidth = 1, linestyle = :dash)
     end
     lines!(ax_c, [NaN], [NaN], color = C_TRUE, linewidth = 1, linestyle = :dash, label = "True")
-    axislegend(ax_c, position = :rt, framevisible = false, labelsize = 11)
+    axislegend(ax_c, position = :rt, framevisible = false, labelsize = 15)
 
     # (d) TGA feature accuracy — from cached tga_data
     ax_d = Axis(fig[2, 3], ylabel = "Predicted / True", title = "(d)  TGA feature accuracy")
@@ -174,10 +174,10 @@ let
             d = tga_data[key]
             c_fill, c_mean, _ = C_VALID_TF[ti]
             lines!(ax_d, [x_pos, x_pos], [d.lo, d.hi], color = c_mean, linewidth = 3)
-            scatter!(ax_d, [x_pos], [d.mu], color = c_mean, markersize = 10)
+            scatter!(ax_d, [x_pos], [d.mu], color = c_mean, markersize = 13)
             mkr_color = d.covered ? :black : C_THEORY
             mkr_label = d.covered ? "Truth covered" : "Truth not covered"
-            scatter!(ax_d, [x_pos], [1.0], color = mkr_color, markersize = 8, marker = :xcross, label = mkr_label)
+            scatter!(ax_d, [x_pos], [1.0], color = mkr_color, markersize = 11, marker = :xcross, label = mkr_label)
             push!(xtick_pos, x_pos)
             push!(xtick_labels_d, "$(Int(tf))")
         end
@@ -194,11 +194,11 @@ let
     y_label = maximum(all_hi) + 0.03
     for (fi, fl) in enumerate(display_labels)
         mid_x = mean(xtick_pos[(fi-1)*3+1 : fi*3])
-        text!(ax_d, mid_x, y_label; text = fl, align = (:center, :bottom), fontsize = 14, font = :bold)
+        text!(ax_d, mid_x, y_label; text = fl, align = (:center, :bottom), fontsize = 17, font = :bold)
     end
     ylims!(ax_d, nothing, y_label + 0.05)
 
-    axislegend(ax_d, position = :rb, framevisible = false, labelsize = 11, unique = true)
+    axislegend(ax_d, position = :rb, framevisible = false, labelsize = 15, unique = true)
 
     safe_save(joinpath(FIGDIR, "fig_ensemble_insights.pdf"), fig)
     copy_to_arxiv("fig_ensemble_insights.pdf")
@@ -243,10 +243,10 @@ let
         band!(ax_a, train_times[i], lo, hi, color = c_fill)
         lines!(ax_a, train_times[i], μ, color = c_mean, linewidth = 2, label = TF_TRAIN_LABELS[i])
         scatter!(ax_a, train_times[i][sparse], train_data[i][sparse] .* 1e9,
-            color = c_data, markersize = 5)
+            color = c_data, markersize = 8)
     end
-    scatter!(ax_a, [NaN], [NaN], color = C_DATA, markersize = 5, label = "Synthetic training data")
-    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 11)
+    scatter!(ax_a, [NaN], [NaN], color = C_DATA, markersize = 8, label = "Synthetic training data")
+    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 15)
 
     # (b) Held-out predictions — solid = ensemble mean, dashed = true
     ax_b = Axis(fig[1, 2], xlabel = "Time (s)", ylabel = "Total thrombin (nM)",
@@ -260,7 +260,7 @@ let
             color = c_true, linewidth = 1, linestyle = :dash)
     end
     lines!(ax_b, [NaN], [NaN], color = C_TRUE, linewidth = 1, linestyle = :dash, label = "Perturbed model")
-    axislegend(ax_b, position = :rt, framevisible = false, labelsize = 11)
+    axislegend(ax_b, position = :rt, framevisible = false, labelsize = 15)
 
     # (c) TGA feature accuracy — from cached data
     ax_c = Axis(fig[2, 1], ylabel = "Predicted / True",
@@ -278,9 +278,9 @@ let
             d = misspec_tga_data[key]
             c_fill, c_mean, _ = C_TF_VALID[ti]
             lines!(ax_c, [x_pos, x_pos], [d.lo, d.hi], color = c_mean, linewidth = 3)
-            scatter!(ax_c, [x_pos], [d.mu], color = c_mean, markersize = 10)
+            scatter!(ax_c, [x_pos], [d.mu], color = c_mean, markersize = 13)
             mkr_color = d.covered ? :black : C_THEORY
-            scatter!(ax_c, [x_pos], [1.0], color = mkr_color, markersize = 8, marker = :xcross)
+            scatter!(ax_c, [x_pos], [1.0], color = mkr_color, markersize = 11, marker = :xcross)
             push!(xtick_pos, x_pos)
             push!(xtick_labels_c, "$(Int(tf))")
         end
@@ -296,7 +296,7 @@ let
     y_label = maximum(all_hi) + 0.03
     for (fi, fl) in enumerate(display_labels)
         mid_x = mean(xtick_pos[(fi-1)*3+1 : fi*3])
-        text!(ax_c, mid_x, y_label; text = fl, align = (:center, :bottom), fontsize = 14, font = :bold)
+        text!(ax_c, mid_x, y_label; text = fl, align = (:center, :bottom), fontsize = 17, font = :bold)
     end
     ylims!(ax_c, nothing, y_label + 0.05)
 
@@ -308,12 +308,12 @@ let
         color = C_THEORY, linewidth = 1.5, linestyle = :dash, label = "Identity")
     for k in 1:min(n_valid, 200)
         scatter!(ax_d, TRUE_LOG, PC[:, ens_idx_valid[k]],
-            color = (C_PE, 0.08), markersize = 5)
+            color = (C_PE, 0.08), markersize = 8)
     end
-    scatter!(ax_d, [NaN], [NaN], color = (C_PE, 0.4), markersize = 6, label = "Ensemble members")
+    scatter!(ax_d, [NaN], [NaN], color = (C_PE, 0.4), markersize = 9, label = "Ensemble members")
     median_est = vec(median(PC[:, ens_idx_valid], dims=2))
-    scatter!(ax_d, TRUE_LOG, median_est, color = C_DATA, markersize = 10, marker = :diamond, label = "Median")
-    axislegend(ax_d, position = :rb, framevisible = false, labelsize = 11)
+    scatter!(ax_d, TRUE_LOG, median_est, color = C_DATA, markersize = 13, marker = :diamond, label = "Median")
+    axislegend(ax_d, position = :rb, framevisible = false, labelsize = 15)
 
     safe_save(joinpath(FIGDIR, "fig_misspecification.pdf"), fig)
     copy_to_arxiv("fig_misspecification.pdf")
@@ -352,10 +352,10 @@ let
         band!(ax_a, train_times_fine[i], lo, hi, color = c_fill)
         lines!(ax_a, train_times_fine[i], μ, color = c_mean, linewidth = 2, label = TF_LABELS_coag[i])
         scatter!(ax_a, train_times[i][sparse], train_data[i][sparse] .* 1e9,
-            color = c_data, markersize = 5)
+            color = c_data, markersize = 8)
     end
-    scatter!(ax_a, [NaN], [NaN], color = C_DATA, markersize = 5, label = "Synthetic training data")
-    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 11)
+    scatter!(ax_a, [NaN], [NaN], color = C_DATA, markersize = 8, label = "Synthetic training data")
+    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 15)
 
     # (b) Parameter recovery — identity + ensemble cloud + median
     ax_b = Axis(fig[2, 1], xlabel = "True value (log₁₀)", ylabel = "Estimated value (log₁₀)",
@@ -365,12 +365,12 @@ let
         color = C_THEORY, linewidth = 1.5, linestyle = :dash, label = "Identity")
     for k in 1:min(length(ens_idx_valid), 200)
         scatter!(ax_b, TRUE_LOG_coag, PC[:, ens_idx_valid[k]],
-            color = (C_PE, 0.12), markersize = 5)
+            color = (C_PE, 0.12), markersize = 8)
     end
-    scatter!(ax_b, [NaN], [NaN], color = (C_PE, 0.4), markersize = 6, label = "Ensemble members")
+    scatter!(ax_b, [NaN], [NaN], color = (C_PE, 0.4), markersize = 9, label = "Ensemble members")
     median_est_coag = vec(median(PC[:, ens_idx_valid], dims=2))
-    scatter!(ax_b, TRUE_LOG_coag, median_est_coag, color = C_DATA, markersize = 10, marker = :diamond, label = "Median")
-    axislegend(ax_b, position = :rb, framevisible = false, labelsize = 11)
+    scatter!(ax_b, TRUE_LOG_coag, median_est_coag, color = C_DATA, markersize = 13, marker = :diamond, label = "Median")
+    axislegend(ax_b, position = :rb, framevisible = false, labelsize = 15)
 
     # (c) Pareto front projection — rank-based coloring
     ax_c = Axis(fig[2, 2], xlabel = "log₁₀(ε₁, 5 pM TF)", ylabel = "log₁₀(ε₂, 15 pM TF)",
@@ -380,10 +380,10 @@ let
     near_idx = findall(RA .> 0)
     p_idx = findall(RA .== 0)
     scatter!(ax_c, log_e1[near_idx], log_e2[near_idx],
-        color = (C_PE, 0.3), markersize = 4, label = "Near-optimal")
+        color = (C_PE, 0.3), markersize = 7, label = "Near-optimal")
     scatter!(ax_c, log_e1[p_idx], log_e2[p_idx],
-        color = C_FRONT, markersize = 6, label = "Pareto front")
-    axislegend(ax_c, position = :rt, framevisible = false, labelsize = 11)
+        color = C_FRONT, markersize = 9, label = "Pareto front")
+    axislegend(ax_c, position = :rt, framevisible = false, labelsize = 15)
 
     safe_save(joinpath(FIGDIR, "fig_coagulation.pdf"), fig)
     copy_to_arxiv("fig_coagulation.pdf")
@@ -424,10 +424,10 @@ let
         d = exp_data[cond]
         band!(ax_a, PLOT_TIMES, lo, hi, color = c_fill)
         lines!(ax_a, PLOT_TIMES, μ, color = c_mean, linewidth = 2, label = label)
-        scatter!(ax_a, d.time_min, d.thrombin_nM, color = c_data, markersize = 8)
+        scatter!(ax_a, d.time_min, d.thrombin_nM, color = c_data, markersize = 11)
     end
-    scatter!(ax_a, [NaN], [NaN], color = C_DATA, markersize = 8, label = "Exp. data")
-    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 11)
+    scatter!(ax_a, [NaN], [NaN], color = C_DATA, markersize = 11, label = "Exp. data")
+    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 15)
 
     # (b) Held-out predictions — solid = ensemble mean, scatter = experimental data
     ax_b = Axis(fig[1, 2], xlabel = "Time (min)", ylabel = "Thrombin (nmol/L)",
@@ -439,10 +439,10 @@ let
         d = exp_data[cond]
         band!(ax_b, PLOT_TIMES, lo, hi, color = c_fill)
         lines!(ax_b, PLOT_TIMES, μ, color = c_mean, linewidth = 2, label = label)
-        scatter!(ax_b, d.time_min, d.thrombin_nM, color = c_data, markersize = 8)
+        scatter!(ax_b, d.time_min, d.thrombin_nM, color = c_data, markersize = 11)
     end
-    scatter!(ax_b, [NaN], [NaN], color = C_DATA, markersize = 8, label = "Exp. data")
-    axislegend(ax_b, position = :rt, framevisible = false, labelsize = 11)
+    scatter!(ax_b, [NaN], [NaN], color = C_DATA, markersize = 11, label = "Exp. data")
+    axislegend(ax_b, position = :rt, framevisible = false, labelsize = 15)
 
     # (c) Pareto front
     ax_c = Axis(fig[2, 1], xlabel = "log₁₀(ε₁, 50% FII)", ylabel = "log₁₀(ε₂, 100% FII)",
@@ -453,10 +453,10 @@ let
     e3_norm = clamp.((e3_vals .- minimum(e3_vals)) ./ (maximum(e3_vals) - minimum(e3_vals) + 1e-10), 0, 1)
     colors = [RGBAf(0.20 + 0.40*t, 0.45 + 0.25*t, 0.78 - 0.25*t, 0.55) for t in e3_norm]
     order = sortperm(RA, rev=true)
-    scatter!(ax_c, log_e1[order], log_e2[order], color = colors[order], markersize = 4, label = "Near-optimal")
+    scatter!(ax_c, log_e1[order], log_e2[order], color = colors[order], markersize = 7, label = "Near-optimal")
     p_idx = findall(RA .== 0)
-    scatter!(ax_c, log_e1[p_idx], log_e2[p_idx], color = C_FRONT, markersize = 6, label = "Pareto front")
-    axislegend(ax_c, position = :rb, framevisible = false, labelsize = 11)
+    scatter!(ax_c, log_e1[p_idx], log_e2[p_idx], color = C_FRONT, markersize = 9, label = "Pareto front")
+    axislegend(ax_c, position = :rb, framevisible = false, labelsize = 15)
 
     # (d) Parameter estimates vs nominal — bigger markers
     ax_d = Axis(fig[2, 2], xlabel = "Nominal value (log₁₀)", ylabel = "Estimated value (log₁₀)",
@@ -466,12 +466,12 @@ let
         color = C_THEORY, linewidth = 1.5, linestyle = :dash, label = "Identity")
     for k in 1:min(n_valid, 200)
         scatter!(ax_d, NOMINAL_LOG, PC[:, ens_idx_valid[k]],
-            color = (C_PE, 0.08), markersize = 6)
+            color = (C_PE, 0.08), markersize = 9)
     end
-    scatter!(ax_d, [NaN], [NaN], color = (C_PE, 0.4), markersize = 6, label = "Ensemble members")
+    scatter!(ax_d, [NaN], [NaN], color = (C_PE, 0.4), markersize = 9, label = "Ensemble members")
     median_est = vec(median(PC[:, ens_idx_valid], dims=2))
-    scatter!(ax_d, NOMINAL_LOG, median_est, color = C_DATA, markersize = 10, marker = :diamond, label = "Median")
-    axislegend(ax_d, position = :rb, framevisible = false, labelsize = 11)
+    scatter!(ax_d, NOMINAL_LOG, median_est, color = C_DATA, markersize = 13, marker = :diamond, label = "Median")
+    axislegend(ax_d, position = :rb, framevisible = false, labelsize = 15)
 
     safe_save(joinpath(FIGDIR, "fig_coagulation_realdata.pdf"), fig)
     copy_to_arxiv("fig_coagulation_realdata.pdf")

@@ -332,9 +332,9 @@ let
         band!(ax_a, train_times[i], lo, hi, color = c_fill, label = "95% CI ($(TF_TRAIN_LABELS[i]))")
         lines!(ax_a, train_times[i], μ, color = c_mean, linewidth = 2, linestyle = :dash, label = "Mean ($(TF_TRAIN_LABELS[i]))")
         scatter!(ax_a, train_times[i][sparse], train_data[i][sparse] .* 1e9,
-            color = c_data, markersize = 7, label = "Data ($(TF_TRAIN_LABELS[i]))")
+            color = c_data, markersize = 10, label = "Data ($(TF_TRAIN_LABELS[i]))")
     end
-    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 11)
+    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 15)
 
     # --- (b) Held-out predictions ---
     ax_b = Axis(fig[1, 2],
@@ -348,7 +348,7 @@ let
         lines!(ax_b, valid_times[i], valid_true[i] .* 1e9,
             color = c_true, linewidth = 2, label = "True ($(TF_VALID_LABELS[i]))")
     end
-    axislegend(ax_b, position = :rt, framevisible = false, labelsize = 11)
+    axislegend(ax_b, position = :rt, framevisible = false, labelsize = 15)
 
     # --- (c) TGA feature accuracy ---
     ax_c = Axis(fig[2, 1],
@@ -392,9 +392,9 @@ let
 
             _, c_mean, _ = C_TF_VALID[ti]
             lines!(ax_c, [x_pos, x_pos], [lo_q, hi_q], color = c_mean, linewidth = 3)
-            scatter!(ax_c, [x_pos], [μ], color = c_mean, markersize = 10)
+            scatter!(ax_c, [x_pos], [μ], color = c_mean, markersize = 13)
             mkr_color = covered ? :black : C_THEORY
-            scatter!(ax_c, [x_pos], [1.0], color = mkr_color, markersize = 8, marker = :xcross)
+            scatter!(ax_c, [x_pos], [1.0], color = mkr_color, markersize = 11, marker = :xcross)
 
             push!(xtick_pos, x_pos)
             push!(xtick_labels_c, "$(Int(tf))")
@@ -421,14 +421,14 @@ let
         title = "(d)  Parameter recovery (misspecified)")
     for k in 1:min(n_valid, 200)
         scatter!(ax_d, TRUE_LOG, PC[:, ens_idx_valid[k]],
-            color = (C_PE, 0.08), markersize = 3)
+            color = (C_PE, 0.08), markersize = 5)
     end
     lims = (minimum(LOG_LOWER) - 0.5, maximum(LOG_UPPER) + 0.5)
     lines!(ax_d, [lims[1], lims[2]], [lims[1], lims[2]],
         color = C_THEORY, linewidth = 1.5, linestyle = :dash, label = "Identity line")
     median_est = vec(median(PC[:, ens_idx_valid], dims=2))
-    scatter!(ax_d, TRUE_LOG, median_est, color = C_DATA, markersize = 8, marker = :diamond, label = "Median estimate")
-    axislegend(ax_d, position = :rb, framevisible = false, labelsize = 11)
+    scatter!(ax_d, TRUE_LOG, median_est, color = C_DATA, markersize = 11, marker = :diamond, label = "Median estimate")
+    axislegend(ax_d, position = :rb, framevisible = false, labelsize = 15)
 
     save(joinpath(FIGDIR, "fig_misspecification.pdf"), fig)
     println("  Saved fig_misspecification.pdf")

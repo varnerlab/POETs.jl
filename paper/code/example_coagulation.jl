@@ -221,9 +221,9 @@ let
         band!(ax_a, train_times[i], lo, hi, color = c_fill)
         lines!(ax_a, train_times[i], μ, color = c_mean, linewidth = 2, linestyle = :dash)
         scatter!(ax_a, train_times[i][sparse], train_data[i][sparse] .* 1e9,
-            color = c_data, markersize = 7, label = TF_LABELS[i])
+            color = c_data, markersize = 10, label = TF_LABELS[i])
     end
-    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 11)
+    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 15)
 
     # --- (b) Parameter recovery (log-log) ---
     ax_b = Axis(fig[2, 1],
@@ -231,14 +231,14 @@ let
         title = "(b)  Parameter recovery")
     for k in 1:min(n_valid, 200)
         scatter!(ax_b, TRUE_LOG, PC[:, ens_idx_valid[k]],
-            color = (C_PE, 0.12), markersize = 3)
+            color = (C_PE, 0.12), markersize = 5)
     end
     lims = (minimum(LOG_LOWER) - 0.5, maximum(LOG_UPPER) + 0.5)
     lines!(ax_b, [lims[1], lims[2]], [lims[1], lims[2]],
         color = C_THEORY, linewidth = 1.5, linestyle = :dash, label = "Identity line")
     median_est = vec(median(PC[:, ens_idx_valid], dims=2))
-    scatter!(ax_b, TRUE_LOG, median_est, color = C_DATA, markersize = 8, marker = :diamond, label = "Median estimate")
-    axislegend(ax_b, position = :rb, framevisible = false, labelsize = 11)
+    scatter!(ax_b, TRUE_LOG, median_est, color = C_DATA, markersize = 11, marker = :diamond, label = "Median estimate")
+    axislegend(ax_b, position = :rb, framevisible = false, labelsize = 15)
 
     # --- (c) Pareto front projection (log scale) ---
     ax_c = Axis(fig[2, 2],
@@ -254,10 +254,10 @@ let
     colors = [RGBAf(0.20 + 0.40*t, 0.45 + 0.25*t, 0.78 - 0.25*t, 0.55) for t in e3_norm]
 
     order = sortperm(RA, rev=true)
-    scatter!(ax_c, log_e1[order], log_e2[order], color = colors[order], markersize = 4, label = "Near-optimal")
+    scatter!(ax_c, log_e1[order], log_e2[order], color = colors[order], markersize = 7, label = "Near-optimal")
     p_idx = findall(RA .== 0)
-    scatter!(ax_c, log_e1[p_idx], log_e2[p_idx], color = C_FRONT, markersize = 6, label = "Pareto front")
-    axislegend(ax_c, position = :rt, framevisible = false, labelsize = 11)
+    scatter!(ax_c, log_e1[p_idx], log_e2[p_idx], color = C_FRONT, markersize = 9, label = "Pareto front")
+    axislegend(ax_c, position = :rt, framevisible = false, labelsize = 15)
 
     save(joinpath(FIGDIR, "fig_coagulation.pdf"), fig)
     println("  Saved fig_coagulation.pdf")
@@ -482,7 +482,7 @@ let
         lines!(ax_a, valid_times[i], valid_true[i] .* 1e9,
             color = c_true, linewidth = 2)
     end
-    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 11)
+    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 15)
 
     # --- (b) Parameter correlations ---
     ax_b = Axis(fig[1, 3],
@@ -515,7 +515,7 @@ let
     end
     # Add true trajectory to legend
     lines!(ax_c, [NaN], [NaN], color = C_TRUE, linewidth = 1, linestyle = :dash, label = "True")
-    axislegend(ax_c, position = :rt, framevisible = false, labelsize = 11)
+    axislegend(ax_c, position = :rt, framevisible = false, labelsize = 15)
 
     # --- (d) TGA feature predictions at held-out conditions ---
     # Dot-and-whisker: ensemble mean ± 95% CI normalized to true value
@@ -566,12 +566,12 @@ let
                 color = c_mean, linewidth = 3)
             # Mean dot
             scatter!(ax_d, [x_pos], [μ],
-                color = c_mean, markersize = 10)
+                color = c_mean, markersize = 13)
             # True value marker
             mkr_color = covered ? :black : C_THEORY
             mkr_label = covered ? "Truth covered" : "Truth not covered"
             scatter!(ax_d, [x_pos], [1.0],
-                color = mkr_color, markersize = 8, marker = :xcross, label = mkr_label)
+                color = mkr_color, markersize = 11, marker = :xcross, label = mkr_label)
 
             push!(xtick_pos, x_pos)
             push!(xtick_labels_d, "$(Int(tf))")
@@ -600,7 +600,7 @@ let
             offset = (0, 150))
     end
 
-    axislegend(ax_d, position = :rb, framevisible = false, labelsize = 11, unique = true)
+    axislegend(ax_d, position = :rb, framevisible = false, labelsize = 15, unique = true)
 
     save(joinpath(FIGDIR, "fig_ensemble_insights.pdf"), fig)
     println("  Saved fig_ensemble_insights.pdf")

@@ -248,13 +248,13 @@ let
     # PE near-optimal cloud (light blue)
     p_idx = bk.RA_pe .== 0
     scatter!(ax_a, bk.EC_pe[1, .!p_idx], bk.EC_pe[2, .!p_idx],
-        color = C_PE_PT, markersize = 2)
+        color = C_PE_PT, markersize = 4)
     # PE front (solid blue)
     scatter!(ax_a, bk.EC_pe[1, p_idx], bk.EC_pe[2, p_idx],
-        color = C_PE, markersize = 3)
+        color = C_PE, markersize = 5)
     # NSGA-II front (orange)
     scatter!(ax_a, bk.nsga_objs[1,:], bk.nsga_objs[2,:],
-        color = C_NSGA, markersize = 5, marker = :diamond)
+        color = C_NSGA, markersize = 8, marker = :diamond)
 
     # --- (b) Fonseca-Fleming: both solvers overlaid ---
     ax_b = Axis(fig[1, 2], xlabel = "f\u2081", ylabel = "f\u2082",
@@ -262,20 +262,20 @@ let
 
     p_idx_ff = ff.RA_pe .== 0
     scatter!(ax_b, ff.EC_pe[1, .!p_idx_ff], ff.EC_pe[2, .!p_idx_ff],
-        color = C_PE_PT, markersize = 2)
+        color = C_PE_PT, markersize = 4)
     scatter!(ax_b, ff.EC_pe[1, p_idx_ff], ff.EC_pe[2, p_idx_ff],
-        color = C_PE, markersize = 3)
+        color = C_PE, markersize = 5)
     scatter!(ax_b, ff.nsga_objs[1,:], ff.nsga_objs[2,:],
-        color = C_NSGA, markersize = 5, marker = :diamond)
+        color = C_NSGA, markersize = 8, marker = :diamond)
 
     # Theoretical front (plotted last so it's visible on top)
     lines!(ax_b, ff_ref_front[1,:], ff_ref_front[2,:],
         color = (C_THEORY, 0.5), linewidth = 2, linestyle = :dash)
 
     # Shared legend
-    elem_pe_front = MarkerElement(color = C_PE, marker = :circle, markersize = 5)
-    elem_pe_near = MarkerElement(color = C_PE_PT, marker = :circle, markersize = 4)
-    elem_nsga = MarkerElement(color = C_NSGA, marker = :diamond, markersize = 6)
+    elem_pe_front = MarkerElement(color = C_PE, marker = :circle, markersize = 8)
+    elem_pe_near = MarkerElement(color = C_PE_PT, marker = :circle, markersize = 7)
+    elem_nsga = MarkerElement(color = C_NSGA, marker = :diamond, markersize = 9)
     elem_theo = LineElement(color = (C_THEORY, 0.5), linewidth = 2, linestyle = :dash)
     Legend(fig[2, 1:2],
         [elem_pe_front, elem_pe_near, elem_nsga, elem_theo],

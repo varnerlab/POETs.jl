@@ -218,7 +218,7 @@ let
     band!(ax_a, t_fine, m_lo, m_hi, color = C_ENSEMBLE_FILL)
     lines!(ax_a, t_fine, m_mean, color = C_MEAN, linewidth = 2, linestyle = :dash)
     errorbars!(ax_a, T_OBS, m_data, m_err, color = C_DATA, whiskerwidth = 5)
-    scatter!(ax_a, T_OBS, m_data, color = C_DATA, markersize = 7)
+    scatter!(ax_a, T_OBS, m_data, color = C_DATA, markersize = 10)
 
     # --- (b) protein ---
     ax_b = Axis(fig[1, 2],
@@ -228,7 +228,7 @@ let
     band!(ax_b, t_fine, p_lo ./ 1000, p_hi ./ 1000, color = C_ENSEMBLE_FILL)
     lines!(ax_b, t_fine, p_mean ./ 1000, color = C_MEAN, linewidth = 2, linestyle = :dash)
     errorbars!(ax_b, T_OBS, p_data_uM, p_err_uM, color = C_DATA, whiskerwidth = 5)
-    scatter!(ax_b, T_OBS, p_data_uM, color = C_DATA, markersize = 7)
+    scatter!(ax_b, T_OBS, p_data_uM, color = C_DATA, markersize = 10)
 
     # --- (c) Pareto front (log scale to prevent smashing into origin) ---
     ax_c = Axis(fig[1, 3],
@@ -242,16 +242,16 @@ let
     p_idx = RA .== 0
     n_idx = .!p_idx
     scatter!(ax_c, log_e1[n_idx], log_e2[n_idx],
-        color = C_ENSEMBLE, markersize = 4)
+        color = C_ENSEMBLE, markersize = 7)
     scatter!(ax_c, log_e1[p_idx], log_e2[p_idx],
-        color = C_FRONT, markersize = 6)
+        color = C_FRONT, markersize = 9)
 
     # legend
     elem_band = PolyElement(color = C_ENSEMBLE_FILL)
     elem_mean = LineElement(color = C_MEAN, linewidth = 2, linestyle = :dash)
-    elem_data = MarkerElement(color = C_DATA, marker = :circle, markersize = 7)
-    elem_pareto = MarkerElement(color = C_FRONT, marker = :circle, markersize = 6)
-    elem_near = MarkerElement(color = C_ENSEMBLE, marker = :circle, markersize = 4)
+    elem_data = MarkerElement(color = C_DATA, marker = :circle, markersize = 10)
+    elem_pareto = MarkerElement(color = C_FRONT, marker = :circle, markersize = 9)
+    elem_near = MarkerElement(color = C_ENSEMBLE, marker = :circle, markersize = 7)
     Legend(fig[2, 1:3],
         [elem_data, elem_mean, elem_band, elem_pareto, elem_near],
         ["Experimental data", "Ensemble mean", "95% CI", "Rank = 0", "Near-optimal"],
