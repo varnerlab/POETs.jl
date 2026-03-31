@@ -12,8 +12,11 @@ using HockinMannModel
 using CairoMakie
 using Random
 using Statistics
+using JLD2
 
 const FIGDIR = joinpath(@__DIR__, "..", "figures")
+const CACHEDIR = joinpath(@__DIR__, "data")
+const CACHE_FILE = joinpath(CACHEDIR, "coagulation_results.jld2")
 
 # ──────────────────────────────────────────────────────────────
 # Model setup: HockinMann2002 (34 species, 42 rate constants)
@@ -218,8 +221,9 @@ let
         band!(ax_a, train_times[i], lo, hi, color = c_fill)
         lines!(ax_a, train_times[i], μ, color = c_mean, linewidth = 2, linestyle = :dash)
         scatter!(ax_a, train_times[i][sparse], train_data[i][sparse] .* 1e9,
-            color = c_data, markersize = 7)
+            color = c_data, markersize = 7, label = TF_LABELS[i])
     end
+    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 11)
 
     # --- (b) Parameter recovery (log-log) ---
     ax_b = Axis(fig[2, 1],
@@ -231,9 +235,10 @@ let
     end
     lims = (minimum(LOG_LOWER) - 0.5, maximum(LOG_UPPER) + 0.5)
     lines!(ax_b, [lims[1], lims[2]], [lims[1], lims[2]],
-        color = C_THEORY, linewidth = 1.5, linestyle = :dash)
+        color = C_THEORY, linewidth = 1.5, linestyle = :dash, label = "Identity line")
     median_est = vec(median(PC[:, ens_idx_valid], dims=2))
-    scatter!(ax_b, TRUE_LOG, median_est, color = C_DATA, markersize = 8, marker = :diamond)
+    scatter!(ax_b, TRUE_LOG, median_est, color = C_DATA, markersize = 8, marker = :diamond, label = "Median estimate")
+    axislegend(ax_b, position = :rb, framevisible = false, labelsize = 11)
 
     # --- (c) Pareto front projection (log scale) ---
     ax_c = Axis(fig[2, 2],
@@ -249,31 +254,10 @@ let
     colors = [RGBAf(0.20 + 0.40*t, 0.45 + 0.25*t, 0.78 - 0.25*t, 0.55) for t in e3_norm]
 
     order = sortperm(RA, rev=true)
-    scatter!(ax_c, log_e1[order], log_e2[order], color = colors[order], markersize = 4)
+    scatter!(ax_c, log_e1[order], log_e2[order], color = colors[order], markersize = 4, label = "Near-optimal")
     p_idx = findall(RA .== 0)
-    scatter!(ax_c, log_e1[p_idx], log_e2[p_idx], color = C_FRONT, markersize = 6)
-
-    # Compact legend: encoding + TF color key
-    legend_elems = [
-        # Encoding
-        MarkerElement(color = :gray40, marker = :circle, markersize = 7),
-        LineElement(color = :gray40, linewidth = 2, linestyle = :dash),
-        PolyElement(color = RGBAf(0.5, 0.5, 0.5, 0.25)),
-        LineElement(color = C_THEORY, linewidth = 1.5, linestyle = :dash),
-        MarkerElement(color = C_DATA, marker = :diamond, markersize = 8),
-        MarkerElement(color = C_FRONT, marker = :circle, markersize = 6),
-        # TF color swatches
-        PolyElement(color = C_TF[1][1], strokecolor = C_TF[1][2], strokewidth = 1),
-        PolyElement(color = C_TF[2][1], strokecolor = C_TF[2][2], strokewidth = 1),
-        PolyElement(color = C_TF[3][1], strokecolor = C_TF[3][2], strokewidth = 1),
-    ]
-    legend_labels = [
-        "Data", "Ensemble mean", "95% CI",
-        "Identity line", "Median estimate", "Pareto front",
-        TF_LABELS[1], TF_LABELS[2], TF_LABELS[3],
-    ]
-    Legend(fig[3, 1:2], legend_elems, legend_labels,
-        orientation = :horizontal, tellwidth = false, tellheight = true, nbanks = 1)
+    scatter!(ax_c, log_e1[p_idx], log_e2[p_idx], color = C_FRONT, markersize = 6, label = "Pareto front")
+    axislegend(ax_c, position = :rt, framevisible = false, labelsize = 11)
 
     save(joinpath(FIGDIR, "fig_coagulation.pdf"), fig)
     println("  Saved fig_coagulation.pdf")
@@ -456,6 +440,14 @@ _, true_mild   = simulate_patient(P_TRUE; TF_pM=5.0, VIII_pct=30.0)
 _, true_severe = simulate_patient(P_TRUE; TF_pM=5.0, VIII_pct=5.0)
 
 # ══════════════════════════════════════════════════════════════
+# Cache all simulation results so figures can be regenerated
+# without re-running expensive simulations
+# ══════════════════════════════════════════════════════════════
+println("\nSaving simulation results to cache...")
+@save CACHE_FILE EC PC RA train_times train_true train_data Thr_train ens_idx_valid valid_mask Thr_valid valid_times valid_true cor_matrix Thr_normal Thr_mild Thr_severe true_normal true_mild true_severe
+println("  Saved to $CACHE_FILE")
+
+# ══════════════════════════════════════════════════════════════
 # Figure 2: Ensemble insights (4-panel, 2×2)
 #   (a) Held-out thrombin profiles at 10, 20, 30 pM TF
 #   (b) Parameter correlation heatmap
@@ -484,12 +476,13 @@ let
         c_fill, c_mean, c_true = C_VALID_TF[i]
         μ, lo, hi = valid_stats[i]
         # Ensemble CI band and mean
-        band!(ax_a, valid_times[i], lo, hi, color = c_fill)
+        band!(ax_a, valid_times[i], lo, hi, color = c_fill, label = VALID_LABELS[i])
         lines!(ax_a, valid_times[i], μ, color = c_mean, linewidth = 2, linestyle = :dash)
         # True trajectory
         lines!(ax_a, valid_times[i], valid_true[i] .* 1e9,
             color = c_true, linewidth = 2)
     end
+    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 11)
 
     # --- (b) Parameter correlations ---
     ax_b = Axis(fig[1, 3],
@@ -502,7 +495,7 @@ let
 
     hm = heatmap!(ax_b, 1:N_EST, 1:N_EST, cor_matrix,
         colormap = :RdBu, colorrange = (-1, 1))
-    Colorbar(fig[1, 3][1, 2], hm, label = "r")
+    Colorbar(fig[1, 4], hm, label = "r", width = 12)
 
     # --- (c) Patient predictions ---
     ax_c = Axis(fig[2, 1:2],
@@ -522,7 +515,7 @@ let
     end
     # Add true trajectory to legend
     lines!(ax_c, [NaN], [NaN], color = C_TRUE, linewidth = 1, linestyle = :dash, label = "True")
-    axislegend(ax_c, position = :rt)
+    axislegend(ax_c, position = :rt, framevisible = false, labelsize = 11)
 
     # --- (d) TGA feature predictions at held-out conditions ---
     # Dot-and-whisker: ensemble mean ± 95% CI normalized to true value
@@ -576,8 +569,9 @@ let
                 color = c_mean, markersize = 10)
             # True value marker
             mkr_color = covered ? :black : C_THEORY
+            mkr_label = covered ? "Truth covered" : "Truth not covered"
             scatter!(ax_d, [x_pos], [1.0],
-                color = mkr_color, markersize = 8, marker = :xcross)
+                color = mkr_color, markersize = 8, marker = :xcross, label = mkr_label)
 
             push!(xtick_pos, x_pos)
             push!(xtick_labels_d, "$(Int(tf))")
@@ -593,33 +587,20 @@ let
         vlines!(ax_d, [sep], color = :gray70, linewidth = 0.6, linestyle = :dot)
     end
 
+    # Add top padding so feature group labels don't overlap data
+    ylims!(ax_d, nothing, nothing)
+    cur_lo, cur_hi = ax_d.finallimits[].origin[2], ax_d.finallimits[].origin[2] + ax_d.finallimits[].widths[2]
+    ylims!(ax_d, cur_lo, cur_hi + 0.15 * (cur_hi - cur_lo))
+
     # Feature group labels at top
     for (fi, fl) in enumerate(display_labels)
         mid_x = mean(xtick_pos[(fi-1)*3+1 : fi*3])
         text!(ax_d, mid_x, 1.0; text = fl,
             align = (:center, :bottom), fontsize = 11,
-            offset = (0, 55))
+            offset = (0, 150))
     end
 
-    # Compact legend: encoding + TF color key for panel (a)
-    legend_elems = [
-        LineElement(color = :gray40, linewidth = 2),
-        LineElement(color = :gray40, linewidth = 2, linestyle = :dash),
-        PolyElement(color = RGBAf(0.5, 0.5, 0.5, 0.20)),
-        MarkerElement(color = :black, marker = :xcross, markersize = 8),
-        MarkerElement(color = C_THEORY, marker = :xcross, markersize = 8),
-        # TF color swatches
-        PolyElement(color = C_VALID_TF[1][1], strokecolor = C_VALID_TF[1][2], strokewidth = 1),
-        PolyElement(color = C_VALID_TF[2][1], strokecolor = C_VALID_TF[2][2], strokewidth = 1),
-        PolyElement(color = C_VALID_TF[3][1], strokecolor = C_VALID_TF[3][2], strokewidth = 1),
-    ]
-    legend_labels_list = [
-        "True trajectory", "Ensemble mean", "95% CI",
-        "Truth covered", "Truth not covered",
-        VALID_LABELS[1], VALID_LABELS[2], VALID_LABELS[3],
-    ]
-    Legend(fig[3, 1:3], legend_elems, legend_labels_list,
-        orientation = :horizontal, tellwidth = false, tellheight = true, nbanks = 1)
+    axislegend(ax_d, position = :rb, framevisible = false, labelsize = 11, unique = true)
 
     save(joinpath(FIGDIR, "fig_ensemble_insights.pdf"), fig)
     println("  Saved fig_ensemble_insights.pdf")

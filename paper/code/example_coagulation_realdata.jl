@@ -15,8 +15,11 @@ using CairoMakie
 using Random
 using Statistics
 using DelimitedFiles
+using JLD2
 
 const FIGDIR = joinpath(@__DIR__, "..", "figures")
+const CACHEDIR = joinpath(@__DIR__, "data")
+const CACHE_FILE = joinpath(CACHEDIR, "realdata_results.jld2")
 
 # ──────────────────────────────────────────────────────────────
 # Load experimental data (Butenas et al. 1999, Figure 3)
@@ -277,6 +280,12 @@ for (cond, label) in zip(VALID_CONDITIONS, VALID_LABELS)
 end
 
 # ──────────────────────────────────────────────────────────────
+# Cache results
+# ──────────────────────────────────────────────────────────────
+@save CACHE_FILE EC PC RA Thr_all exp_data PLOT_TIMES SIM_TIMES_MIN NOMINAL_LOG LOG_LOWER LOG_UPPER ESTIMATE_NAMES TRAIN_CONDITIONS VALID_CONDITIONS TRAIN_LABELS VALID_LABELS conditions condition_labels ensemble_idx ens_idx_valid n_valid
+println("  Cached results to $CACHE_FILE")
+
+# ──────────────────────────────────────────────────────────────
 # Figure: Real-data coagulation results (2×2)
 #   (a) Training fits (50%, 100%, 150% FII)
 #   (b) Held-out predictions (75%, 125% FII)
@@ -314,8 +323,9 @@ let
         d = exp_data[cond]
         band!(ax_a, PLOT_TIMES, lo, hi, color = c_fill)
         lines!(ax_a, PLOT_TIMES, μ, color = c_mean, linewidth = 2, linestyle = :dash)
-        scatter!(ax_a, d.time_min, d.thrombin_nM, color = c_data, markersize = 8)
+        scatter!(ax_a, d.time_min, d.thrombin_nM, color = c_data, markersize = 8, label = label)
     end
+    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 11)
 
     # --- (b) Held-out predictions ---
     ax_b = Axis(fig[1, 2],
@@ -329,8 +339,9 @@ let
         d = exp_data[cond]
         band!(ax_b, PLOT_TIMES, lo, hi, color = c_fill)
         lines!(ax_b, PLOT_TIMES, μ, color = c_mean, linewidth = 2, linestyle = :dash)
-        scatter!(ax_b, d.time_min, d.thrombin_nM, color = c_data, markersize = 8)
+        scatter!(ax_b, d.time_min, d.thrombin_nM, color = c_data, markersize = 8, label = label)
     end
+    axislegend(ax_b, position = :rt, framevisible = false, labelsize = 11)
 
     # --- (c) Pareto front ---
     ax_c = Axis(fig[2, 1],
@@ -345,46 +356,25 @@ let
     colors = [RGBAf(0.20 + 0.40*t, 0.45 + 0.25*t, 0.78 - 0.25*t, 0.55) for t in e3_norm]
 
     order = sortperm(RA, rev=true)
-    scatter!(ax_c, log_e1[order], log_e2[order], color = colors[order], markersize = 4)
+    scatter!(ax_c, log_e1[order], log_e2[order], color = colors[order], markersize = 4, label = "Near-optimal")
     p_idx = findall(RA .== 0)
-    scatter!(ax_c, log_e1[p_idx], log_e2[p_idx], color = C_FRONT, markersize = 6)
+    scatter!(ax_c, log_e1[p_idx], log_e2[p_idx], color = C_FRONT, markersize = 6, label = "Pareto front")
+    axislegend(ax_c, position = :rb, framevisible = false, labelsize = 11)
 
     # --- (d) Parameter estimates vs nominal ---
     ax_d = Axis(fig[2, 2],
         xlabel = "Nominal value (log₁₀)", ylabel = "Estimated value (log₁₀)",
         title = "(d)  Parameter estimates")
-    for k in 1:min(n_valid, 200)
-        scatter!(ax_d, NOMINAL_LOG, PC[:, ens_idx_valid[k]],
-            color = (C_PE, 0.08), markersize = 3)
-    end
     lims = (minimum(LOG_LOWER) - 0.5, maximum(LOG_UPPER) + 0.5)
     lines!(ax_d, [lims[1], lims[2]], [lims[1], lims[2]],
-        color = C_THEORY, linewidth = 1.5, linestyle = :dash)
+        color = C_THEORY, linewidth = 1.5, linestyle = :dash, label = "Identity")
+    for k in 1:min(n_valid, 200)
+        scatter!(ax_d, NOMINAL_LOG, PC[:, ens_idx_valid[k]],
+            color = (C_PE, 0.08), markersize = 6)
+    end
     median_est = vec(median(PC[:, ens_idx_valid], dims=2))
-    scatter!(ax_d, NOMINAL_LOG, median_est, color = C_DATA, markersize = 8, marker = :diamond)
-
-    # Compact legend
-    legend_elems = [
-        MarkerElement(color = :gray40, marker = :circle, markersize = 8),
-        LineElement(color = :gray40, linewidth = 2, linestyle = :dash),
-        PolyElement(color = RGBAf(0.5, 0.5, 0.5, 0.20)),
-        LineElement(color = C_THEORY, linewidth = 1.5, linestyle = :dash),
-        MarkerElement(color = C_DATA, marker = :diamond, markersize = 8),
-        MarkerElement(color = C_FRONT, marker = :circle, markersize = 6),
-        # FII level colors
-        PolyElement(color = C_FII[1][1], strokecolor = C_FII[1][2], strokewidth = 1),
-        PolyElement(color = C_FII[2][1], strokecolor = C_FII[2][2], strokewidth = 1),
-        PolyElement(color = C_FII[3][1], strokecolor = C_FII[3][2], strokewidth = 1),
-        PolyElement(color = C_FII[4][1], strokecolor = C_FII[4][2], strokewidth = 1),
-        PolyElement(color = C_FII[5][1], strokecolor = C_FII[5][2], strokewidth = 1),
-    ]
-    legend_labels = [
-        "Exp. data", "Ensemble mean", "95% CI",
-        "Identity / Nominal", "Median estimate", "Pareto front",
-        "50% FII", "75% FII", "100% FII", "125% FII", "150% FII",
-    ]
-    Legend(fig[3, 1:2], legend_elems, legend_labels,
-        orientation = :horizontal, tellwidth = false, tellheight = true, nbanks = 1)
+    scatter!(ax_d, NOMINAL_LOG, median_est, color = C_DATA, markersize = 10, marker = :diamond, label = "Median estimate")
+    axislegend(ax_d, position = :rb, framevisible = false, labelsize = 11)
 
     save(joinpath(FIGDIR, "fig_coagulation_realdata.pdf"), fig)
     println("  Saved fig_coagulation_realdata.pdf")

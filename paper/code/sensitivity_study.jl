@@ -8,8 +8,11 @@ using ParetoEnsembles
 using CairoMakie
 using Random
 using Statistics
+using JLD2
 
 const FIGDIR = joinpath(@__DIR__, "..", "figures")
+const CACHEDIR = joinpath(@__DIR__, "data")
+const CACHE_FILE = joinpath(CACHEDIR, "sensitivity_results.jld2")
 
 # ──────────────────────────────────────────────────────────────
 # Binh-Korn problem (same as generate_figures.jl)
@@ -106,6 +109,12 @@ for ni in n_iters
 end
 
 # ──────────────────────────────────────────────────────────────
+# Cache results
+# ──────────────────────────────────────────────────────────────
+mkpath(CACHEDIR)
+@save CACHE_FILE rank_cutoffs cooling_rates n_iters rc_hvs alpha_hvs niter_hvs
+
+# ──────────────────────────────────────────────────────────────
 # Figure: 3-panel sensitivity analysis (with swarm/strip + box)
 # ──────────────────────────────────────────────────────────────
 include("paper_theme.jl")
@@ -124,17 +133,11 @@ let
         title = "(a)  Rank cutoff",
         xticks = (1:length(rank_cutoffs), string.(rank_cutoffs)))
 
-    for (i, rc) in enumerate(rank_cutoffs)
-        hvs = rc_hvs[rc]
-        # Individual points with jitter
-        jitter = 0.15 .* (rand(length(hvs)) .- 0.5)
-        scatter!(ax_a, fill(i, length(hvs)) .+ jitter, hvs,
-            color = (C_SWEEP, 0.5), markersize = 6)
-        # Median bar
-        med = median(hvs)
-        lines!(ax_a, [i - 0.25, i + 0.25], [med, med],
-            color = C_SWEEP, linewidth = 3)
-    end
+    boxplot!(ax_a,
+        reduce(vcat, [fill(i, length(rc_hvs[rc])) for (i, rc) in enumerate(rank_cutoffs)]),
+        reduce(vcat, [rc_hvs[rc] for rc in rank_cutoffs]),
+        color = (C_SWEEP, 0.4), strokecolor = C_SWEEP, strokewidth = 1.0,
+        mediancolor = :black, medianlinewidth = 2, width = 0.6)
 
     # --- (b) cooling rate ---
     ax_b = Axis(fig[1, 2],
@@ -143,15 +146,11 @@ let
         title = "(b)  Cooling rate",
         xticks = (1:length(cooling_rates), string.(cooling_rates)))
 
-    for (i, alpha) in enumerate(cooling_rates)
-        hvs = alpha_hvs[alpha]
-        jitter = 0.15 .* (rand(length(hvs)) .- 0.5)
-        scatter!(ax_b, fill(i, length(hvs)) .+ jitter, hvs,
-            color = (C_SWEEP, 0.5), markersize = 6)
-        med = median(hvs)
-        lines!(ax_b, [i - 0.25, i + 0.25], [med, med],
-            color = C_SWEEP, linewidth = 3)
-    end
+    boxplot!(ax_b,
+        reduce(vcat, [fill(i, length(alpha_hvs[a])) for (i, a) in enumerate(cooling_rates)]),
+        reduce(vcat, [alpha_hvs[a] for a in cooling_rates]),
+        color = (C_SWEEP, 0.4), strokecolor = C_SWEEP, strokewidth = 1.0,
+        mediancolor = :black, medianlinewidth = 2, width = 0.6)
 
     # --- (c) N_iter ---
     ax_c = Axis(fig[1, 3],
@@ -160,15 +159,11 @@ let
         title = "(c)  Iterations",
         xticks = (1:length(n_iters), string.(n_iters)))
 
-    for (i, ni) in enumerate(n_iters)
-        hvs = niter_hvs[ni]
-        jitter = 0.15 .* (rand(length(hvs)) .- 0.5)
-        scatter!(ax_c, fill(i, length(hvs)) .+ jitter, hvs,
-            color = (C_SWEEP, 0.5), markersize = 6)
-        med = median(hvs)
-        lines!(ax_c, [i - 0.25, i + 0.25], [med, med],
-            color = C_SWEEP, linewidth = 3)
-    end
+    boxplot!(ax_c,
+        reduce(vcat, [fill(i, length(niter_hvs[ni])) for (i, ni) in enumerate(n_iters)]),
+        reduce(vcat, [niter_hvs[ni] for ni in n_iters]),
+        color = (C_SWEEP, 0.4), strokecolor = C_SWEEP, strokewidth = 1.0,
+        mediancolor = :black, medianlinewidth = 2, width = 0.6)
 
     save(joinpath(FIGDIR, "fig_sensitivity.pdf"), fig)
     println("  Saved fig_sensitivity.pdf")

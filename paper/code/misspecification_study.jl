@@ -15,8 +15,11 @@ using HockinMannModel
 using CairoMakie
 using Random
 using Statistics
+using JLD2
 
 const FIGDIR = joinpath(@__DIR__, "..", "figures")
+const CACHEDIR = joinpath(@__DIR__, "data")
+const CACHE_FILE = joinpath(CACHEDIR, "misspecification_results.jld2")
 
 # ──────────────────────────────────────────────────────────────
 # Model setup (same estimated parameters as main study)
@@ -283,6 +286,13 @@ for tf in VALID_TF
 end
 
 # ──────────────────────────────────────────────────────────────
+# Cache simulation results
+# ──────────────────────────────────────────────────────────────
+println("\nSaving simulation results to cache...")
+@save CACHE_FILE EC PC RA train_times train_data train_true_perturbed Thr_train Thr_valid valid_times valid_true ens_idx_valid valid_mask
+println("  Saved to $CACHE_FILE")
+
+# ──────────────────────────────────────────────────────────────
 # Figure: Misspecification comparison (2×2)
 #   (a) Training fits (misspecified model)
 #   (b) Held-out predictions (misspecified model)
@@ -319,11 +329,12 @@ let
     for i in 1:3
         c_fill, c_mean, c_data = C_TF_TRAIN[i]
         μ, lo, hi = ensemble_stats_nM(Thr_train[i])
-        band!(ax_a, train_times[i], lo, hi, color = c_fill)
-        lines!(ax_a, train_times[i], μ, color = c_mean, linewidth = 2, linestyle = :dash)
+        band!(ax_a, train_times[i], lo, hi, color = c_fill, label = "95% CI ($(TF_TRAIN_LABELS[i]))")
+        lines!(ax_a, train_times[i], μ, color = c_mean, linewidth = 2, linestyle = :dash, label = "Mean ($(TF_TRAIN_LABELS[i]))")
         scatter!(ax_a, train_times[i][sparse], train_data[i][sparse] .* 1e9,
-            color = c_data, markersize = 7)
+            color = c_data, markersize = 7, label = "Data ($(TF_TRAIN_LABELS[i]))")
     end
+    axislegend(ax_a, position = :rt, framevisible = false, labelsize = 11)
 
     # --- (b) Held-out predictions ---
     ax_b = Axis(fig[1, 2],
@@ -332,11 +343,12 @@ let
     for i in 1:3
         c_fill, c_mean, c_true = C_TF_VALID[i]
         μ, lo, hi = ensemble_stats_nM(Thr_valid[i])
-        band!(ax_b, valid_times[i], lo, hi, color = c_fill)
-        lines!(ax_b, valid_times[i], μ, color = c_mean, linewidth = 2, linestyle = :dash)
+        band!(ax_b, valid_times[i], lo, hi, color = c_fill, label = "95% CI ($(TF_VALID_LABELS[i]))")
+        lines!(ax_b, valid_times[i], μ, color = c_mean, linewidth = 2, linestyle = :dash, label = "Mean ($(TF_VALID_LABELS[i]))")
         lines!(ax_b, valid_times[i], valid_true[i] .* 1e9,
-            color = c_true, linewidth = 2)
+            color = c_true, linewidth = 2, label = "True ($(TF_VALID_LABELS[i]))")
     end
+    axislegend(ax_b, position = :rt, framevisible = false, labelsize = 11)
 
     # --- (c) TGA feature accuracy ---
     ax_c = Axis(fig[2, 1],
@@ -398,8 +410,10 @@ let
     for (fi, fl) in enumerate(display_labels)
         mid_x = mean(xtick_pos[(fi-1)*3+1 : fi*3])
         text!(ax_c, mid_x, 1.0; text = fl,
-            align = (:center, :bottom), fontsize = 11, offset = (0, 55))
+            align = (:center, :bottom), fontsize = 11, offset = (0, 150))
     end
+    cur_ylims = ax_c.finallimits[].origin[2], ax_c.finallimits[].origin[2] + ax_c.finallimits[].widths[2]
+    ylims!(ax_c, cur_ylims[1], cur_ylims[2] + 0.15 * (cur_ylims[2] - cur_ylims[1]))
 
     # --- (d) Parameter recovery ---
     ax_d = Axis(fig[2, 2],
@@ -411,20 +425,10 @@ let
     end
     lims = (minimum(LOG_LOWER) - 0.5, maximum(LOG_UPPER) + 0.5)
     lines!(ax_d, [lims[1], lims[2]], [lims[1], lims[2]],
-        color = C_THEORY, linewidth = 1.5, linestyle = :dash)
+        color = C_THEORY, linewidth = 1.5, linestyle = :dash, label = "Identity line")
     median_est = vec(median(PC[:, ens_idx_valid], dims=2))
-    scatter!(ax_d, TRUE_LOG, median_est, color = C_DATA, markersize = 8, marker = :diamond)
-
-    # Compact legend
-    legend_elems = [
-        MarkerElement(color = :gray40, marker = :circle, markersize = 7),
-        LineElement(color = :gray40, linewidth = 2, linestyle = :dash),
-        LineElement(color = :gray40, linewidth = 2),
-        PolyElement(color = RGBAf(0.5, 0.5, 0.5, 0.20)),
-    ]
-    legend_labels = ["Data", "Ensemble mean", "True trajectory", "95% CI"]
-    Legend(fig[3, 1:2], legend_elems, legend_labels,
-        orientation = :horizontal, tellwidth = false, tellheight = true, nbanks = 1)
+    scatter!(ax_d, TRUE_LOG, median_est, color = C_DATA, markersize = 8, marker = :diamond, label = "Median estimate")
+    axislegend(ax_d, position = :rb, framevisible = false, labelsize = 11)
 
     save(joinpath(FIGDIR, "fig_misspecification.pdf"), fig)
     println("  Saved fig_misspecification.pdf")

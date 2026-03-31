@@ -14,8 +14,11 @@ using CSV
 using DataFrames
 using Random
 using Statistics
+using JLD2
 
 const FIGDIR = joinpath(@__DIR__, "..", "figures")
+const CACHEDIR = joinpath(@__DIR__, "data")
+const CACHE_FILE = joinpath(CACHEDIR, "cellfree_results.jld2")
 
 # ──────────────────────────────────────────────────────────────
 # Load experimental data (Adhikari et al. 2020)
@@ -190,6 +193,12 @@ m_hi   = vec(mapslices(x -> quantile(x, 0.975), M_ens, dims=1))
 p_mean = vec(mean(P_ens, dims=1))
 p_lo   = vec(mapslices(x -> quantile(x, 0.025), P_ens, dims=1))
 p_hi   = vec(mapslices(x -> quantile(x, 0.975), P_ens, dims=1))
+
+# ──────────────────────────────────────────────────────────────
+# Cache results to JLD2
+# ──────────────────────────────────────────────────────────────
+@save CACHE_FILE EC PC RA t_fine M_ens P_ens m_mean m_lo m_hi p_mean p_lo p_hi T_OBS m_data m_err p_data p_err p_data_uM p_err_uM
+println("  Cached results to $CACHE_FILE")
 
 # ──────────────────────────────────────────────────────────────
 # Figure: 3-panel cell-free ensemble results

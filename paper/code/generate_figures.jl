@@ -7,8 +7,11 @@
 using ParetoEnsembles
 using CairoMakie
 using Random
+using JLD2
 
 const FIGDIR = joinpath(@__DIR__, "..", "figures")
+const CACHEDIR = joinpath(@__DIR__, "data")
+const CACHE_FILE = joinpath(CACHEDIR, "benchmarks_results.jld2")
 
 # ──────────────────────────────────────────────────────────────
 # Shared styling
@@ -123,6 +126,13 @@ println("  Retained: $(size(EC_bk1, 2)),  Pareto: $(count(RA_bk1 .== 0))")
 
 
 # ──────────────────────────────────────────────────────────────
+# Save results to cache
+# ──────────────────────────────────────────────────────────────
+mkpath(CACHEDIR)
+@save CACHE_FILE EC_bk PC_bk RA_bk EC_ff PC_ff RA_ff EC_bk1 PC_bk1 RA_bk1
+println("Saved benchmark results to $CACHE_FILE")
+
+# ──────────────────────────────────────────────────────────────
 # Figure 1: Combined 2×2 panel
 #   (a) BK objective space   (b) FF objective space
 #   (c) BK parameter space   (d) FF parameter space (x1 vs x2)
@@ -155,16 +165,16 @@ let
         xlabel = L"f_1", ylabel = L"f_2",
         title = "(b)  Fonseca–Fleming (objective space)")
 
-    # theoretical front: t ∈ [-1, 1]
+    scatter!(ax_b, EC_ff[1, order_ff], EC_ff[2, order_ff],
+        color = colors_ff[order_ff],
+        markersize = [RA_ff[i] == 0 ? MARKER_SIZE_PARETO : MARKER_SIZE_NEAR for i in order_ff])
+
+    # theoretical front: t ∈ [-1, 1] (plotted last so it's visible on top)
     t_vals = range(-1, 1, length = 300)
     f1_front = 1 .- exp.(-(t_vals .- 1).^2)
     f2_front = 1 .- exp.(-(t_vals .+ 1).^2)
     lines!(ax_b, f1_front, f2_front,
         color = :red, linewidth = 1.5, linestyle = :dash)
-
-    scatter!(ax_b, EC_ff[1, order_ff], EC_ff[2, order_ff],
-        color = colors_ff[order_ff],
-        markersize = [RA_ff[i] == 0 ? MARKER_SIZE_PARETO : MARKER_SIZE_NEAR for i in order_ff])
 
     # --- (c) Binh–Korn parameter space ---
     ax_c = Axis(fig[2, 1],

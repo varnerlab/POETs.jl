@@ -11,10 +11,13 @@ import ParetoEnsembles: pareto_front as pe_pareto_front, hypervolume as pe_hyper
 using Metaheuristics
 import Metaheuristics: pareto_front as nsga_pareto_front
 using CairoMakie
+using JLD2
 using Random
 using Statistics
 
 const FIGDIR = joinpath(@__DIR__, "..", "figures")
+const CACHEDIR = joinpath(@__DIR__, "data")
+const CACHE_FILE = joinpath(CACHEDIR, "comparison_results.jld2")
 const N_REPS = 5
 
 # ──────────────────────────────────────────────────────────────
@@ -226,6 +229,9 @@ end
 include("paper_theme.jl")
 set_paper_theme!()
 
+mkpath(CACHEDIR)
+@save CACHE_FILE results bk_ref_front ff_ref_front BK_HV_REF FF_HV_REF N_REPS
+
 println("\nGenerating comparison figure...")
 let
     fig = Figure(size = (900, 420))
@@ -254,10 +260,6 @@ let
     ax_b = Axis(fig[1, 2], xlabel = "f\u2081", ylabel = "f\u2082",
         title = "(b)  Fonseca-Fleming")
 
-    # Theoretical front
-    lines!(ax_b, ff_ref_front[1,:], ff_ref_front[2,:],
-        color = (C_THEORY, 0.5), linewidth = 2, linestyle = :dash)
-
     p_idx_ff = ff.RA_pe .== 0
     scatter!(ax_b, ff.EC_pe[1, .!p_idx_ff], ff.EC_pe[2, .!p_idx_ff],
         color = C_PE_PT, markersize = 2)
@@ -265,6 +267,10 @@ let
         color = C_PE, markersize = 3)
     scatter!(ax_b, ff.nsga_objs[1,:], ff.nsga_objs[2,:],
         color = C_NSGA, markersize = 5, marker = :diamond)
+
+    # Theoretical front (plotted last so it's visible on top)
+    lines!(ax_b, ff_ref_front[1,:], ff_ref_front[2,:],
+        color = (C_THEORY, 0.5), linewidth = 2, linestyle = :dash)
 
     # Shared legend
     elem_pe_front = MarkerElement(color = C_PE, marker = :circle, markersize = 5)
