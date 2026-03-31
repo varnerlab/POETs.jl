@@ -1,0 +1,35 @@
+\documentclass[12pt]{letter}
+\usepackage[margin=1in]{geometry}
+\usepackage{url}
+
+\signature{Jeffrey D.\ Varner, Ph.D.\\
+Associate Professor\\
+Robert Frederick Smith School of\\
+Chemical and Biomolecular Engineering\\
+Cornell University\\
+Ithaca, NY 14853\\
+\url{jdv27@cornell.edu}}
+
+\date{\today}
+
+\begin{document}
+
+\begin{letter}{Editor-in-Chief\\
+Computer Methods and Programs in Biomedicine}
+
+\opening{Dear Editor,}
+
+I am pleased to submit the enclosed manuscript, ``ParetoEnsembles.jl: A Julia Package for Multiobjective Parameter Estimation Using Pareto Optimal Ensemble Techniques,'' for consideration as an Original Article in \textit{Computer Methods and Programs in Biomedicine}.
+
+Mathematical models of biological systems frequently contain many adjustable parameters that must be estimated from multiple, potentially conflicting datasets. Rather than reporting a single best-fit parameter vector, generating an ensemble of near-optimal parameter sets provides richer information about what the data can and cannot constrain. This manuscript presents ParetoEnsembles.jl, an open-source Julia package that generates such ensembles using a simulated-annealing-based algorithm with several algorithmic improvements over prior implementations, including a correction from weak to strict Pareto dominance, an incremental ranking scheme that reduces per-iteration cost from quadratic to linear, and multi-chain parallel execution.
+
+We believe this work is well suited to the scope of CMPB for three reasons. First, the package is a computational tool validated on biomedical problems: we demonstrate it on a cell-free gene expression model fitted to experimental data and on the Hockin--Mann blood coagulation cascade, a clinically relevant system with 34 species and 42 rate constants. Second, the manuscript goes beyond software description to show how parameter ensembles enable downstream biomedical analyses, including held-out prediction with uncertainty quantification, identifiability analysis through pairwise parameter correlations, and patient-specific hemophilia~A simulations. Third, we validate the approach against published experimental thrombin generation data from Butenas et al.\ (1999), demonstrating that the ensemble predicts held-out prothrombin conditions to within 1--10\% despite inherent model approximation error.
+
+The manuscript has not been published elsewhere and is not under consideration at any other journal. A preprint is available on arXiv. All code and data needed to reproduce the results are publicly available at \url{https://github.com/varnerlab/ParetoEnsembles.jl}, and the package is registered in the Julia General registry.
+
+Thank you for considering this submission. I look forward to your response.
+
+\closing{Sincerely,}
+
+\end{letter}
+\end{document}
